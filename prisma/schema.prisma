@@ -1,0 +1,163 @@
+// This is your Prisma schema file for AI Research Assistant (Simplified)
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Research Missions (Simplified)
+model ResearchMission {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  status      MissionStatus @default(CREATED)
+  config      String?     // Simple JSON string instead of complex type
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  completedAt DateTime?
+  
+  @@map("research_missions")
+}
+
+enum MissionStatus {
+  CREATED
+  PLANNING
+  RESEARCHING
+  WRITING
+  COMPLETED
+  FAILED
+}
+
+// Documents (Enhanced for RAG)
+model Document {
+  id             String   @id @default(cuid())
+  title          String
+  content        String
+  source         String
+  fileType       String
+  fileSize       Int
+  metadata       String?  // JSON string for additional metadata
+  embedding      String?  // JSON string for vector embeddings
+  relevanceScore Float?   // Relevance score for RAG ranking
+  processed      Boolean  @default(false) // Whether document has been processed for RAG
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Relations
+  documentGroups DocumentGroupDocument[]
+  chunks         DocumentChunk[]
+  
+  @@map("documents")
+}
+
+// Document Groups for organizing documents
+model DocumentGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  missionId   String?
+  userId      String
+  category    String?  // Category for filtering
+  tags        String?  // JSON string for tags
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  documents DocumentGroupDocument[]
+  
+  @@map("document_groups")
+}
+
+// Junction table for Document-Group many-to-many relationship
+model DocumentGroupDocument {
+  documentGroupId String
+  documentId      String
+  
+  // Additional fields for the relationship
+  addedAt         DateTime @default(now())
+  addedBy         String?
+  relevanceScore  Float?   // Relevance score within this group
+  
+  // Relations
+  documentGroup   DocumentGroup @relation(fields: [documentGroupId], references: [id], onDelete: Cascade)
+  document        Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  @@id([documentGroupId, documentId])
+  @@map("document_group_documents")
+}
+
+// Document Chunks for RAG pipeline
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  content    String
+  chunkIndex Int      // Order of chunk in document
+  embedding  String?  // JSON string for vector embeddings
+  metadata   String?  // JSON string for chunk metadata
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  @@map("document_chunks")
+}
+
+// RAG Query Log for tracking search operations
+model RAGQuery {
+  id         String   @id @default(cuid())
+  query      String
+  userId     String?
+  groupId    String?  // Document group to search within
+  filters    String?  // JSON string for search filters
+  results    String?  // JSON string for search results
+  executionTime Float? // Time taken for query in ms
+  createdAt  DateTime @default(now())
+  
+  @@map("rag_queries")
+}
+
+// Prompt Parameters (Simplified)
+model PromptParameter {
+  id     String @id @default(cuid())
+  name   String
+  value  String
+  module String
+  state  ParameterState @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("prompt_parameters")
+}
+
+enum ParameterState {
+  ACTIVE
+  FROZEN
+}
+
+// Optimization Sessions (Simplified)
+model OptimizationSession {
+  id          String                @id @default(cuid())
+  moduleId    String
+  config      String?               // Simple JSON string
+  status      OptimizationStatus    @default(CREATED)
+  bestFitness Float?
+  generationsCompleted Int         @default(0)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  completedAt DateTime?
+  
+  @@map("optimization_sessions")
+}
+
+enum OptimizationStatus {
+  CREATED
+  RUNNING
+  COMPLETED
+  FAILED
+}
