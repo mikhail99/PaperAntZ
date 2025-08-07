@@ -2,7 +2,7 @@
 Document management endpoints
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks, Body
 from typing import List, Optional, Dict, Any
 import json
 
@@ -12,6 +12,7 @@ from api.v1.models import (
 )
 from core.services.document import document_service
 from core.collections_manager import CollectionsManager
+from core.services.paperqa_service import paperqa_service
 from utils.helpers import create_success_response, create_error_response
 
 router = APIRouter()
@@ -373,4 +374,39 @@ async def create_document_group(name: str, description: str = ""):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to create document group: {str(e)}"
+        )
+
+@router.post("/document-groups/{group_id}/paperqa")
+async def paperqa_query(group_id: str, question: str = Body(..., embed=True)):
+    """PaperQA: Comprehensive document analysis and question answering"""
+    try:
+        # Use PaperQA service for detailed analysis
+        result = await paperqa_service.query_documents(
+            collection_name=group_id,
+            question=question
+        )
+        
+        if result.get("error"):
+            raise HTTPException(
+                status_code=400,
+                detail=result["error"]
+            )
+        
+        return create_success_response(
+            data={
+                "question": question,
+                "group_id": group_id,
+                "answer": result["answer_text"],
+                "context": result.get("context", []),
+                "sources_used": len(result.get("context", []))
+            },
+            message="PaperQA analysis completed successfully"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"PaperQA query failed: {str(e)}"
         )

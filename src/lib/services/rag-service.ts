@@ -413,19 +413,41 @@ export class RAGService {
   }
 
   /**
-   * Hybrid search combining semantic and keyword search
+   * Hybrid search using PaperQA for comprehensive analysis
    */
   async hybridSearch(query: string, options: RAGQueryOptions = {}): Promise<SearchResult[]> {
-    // For now, just use semantic search since we don't have a separate keyword search API
-    // In the future, you could implement keyword search via the backend or combine multiple searches
-    const semanticResults = await this.semanticSearch(query, options);
+    // Use PaperQA for hybrid search (comprehensive analysis)
+    const paperqaResult = await this.paperqaQuery(query, options);
     
-    // Boost scores slightly to indicate this was a "hybrid" search
-    return semanticResults.map(result => ({
-      ...result,
-      score: Math.min(result.score * 1.05, 1.0),
-      relevance: Math.min(result.relevance * 1.05, 1.0)
-    }));
+    // Convert PaperQA result to SearchResult format for consistency
+    // Since PaperQA returns a single comprehensive answer, we create a synthetic result
+    const syntheticResult: SearchResult = {
+      chunk: {
+        id: 'paperqa-synthesis',
+        content: paperqaResult.answer,
+        metadata: {
+          sources_used: paperqaResult.sources_used,
+          question: paperqaResult.question,
+          analysis_type: 'paperqa'
+        },
+        embedding: []
+      },
+      document: {
+        id: 'paperqa-document',
+        title: `PaperQA Analysis: ${paperqaResult.question}`,
+        content: paperqaResult.answer,
+        metadata: {
+          sources_used: paperqaResult.sources_used,
+          context: paperqaResult.context
+        },
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      score: 0.95, // High score for comprehensive analysis
+      relevance: 0.95
+    };
+    
+    return [syntheticResult];
   }
 
   /**
@@ -439,6 +461,55 @@ export class RAGService {
       // Slightly lower threshold for keyword search to be more inclusive
       threshold: 0.5
     });
+  }
+
+  /**
+   * PaperQA: Comprehensive document analysis and question answering
+   */
+  async paperqaQuery(query: string, options: RAGQueryOptions = {}): Promise<{
+    answer: string;
+    context: any[];
+    sources_used: number;
+    question: string;
+    group_id: string;
+  }> {
+    const { groupId } = options;
+
+    if (!groupId) {
+      throw new Error('Group ID is required for PaperQA query');
+    }
+
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/document-groups/${groupId}/paperqa`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: query
+        })
+      });
+
+      if (!response.ok) {
+        // Try to surface backend error details to the UI
+        let message = 'Failed to get PaperQA response from backend';
+        try {
+          const err = await response.json();
+          if (err && (err.detail || err.message)) {
+            message = err.detail || err.message;
+          }
+        } catch (_) {
+          // ignore JSON parse errors
+        }
+        throw new Error(message);
+      }
+
+      const backendResponse = await response.json();
+      return backendResponse.data;
+    } catch (error) {
+      console.error('PaperQA query failed:', error);
+      throw error;
+    }
   }
 }
 
