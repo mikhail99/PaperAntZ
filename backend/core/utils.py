@@ -2,10 +2,10 @@ from paperqa import Settings
 from paperqa.settings import AgentSettings, IndexSettings
 import os
 
-#llm_model = "ollama/gemma3:27b"
+llm_model = "ollama/gemma3:4b"
 #embedding_model = "ollama/nomic-embed-text:latest"
 
-#llm_model = "ollama/gemma3:27b"
+#llm_model = "ollama/gemma3:4b"
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def get_local_llm_settings(llm_model, embedding_model) -> Settings:

@@ -37,6 +37,7 @@ export default function RAGSearch({ documentGroups = [], onResultSelect }: RAGSe
   const [loading, setLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
+  const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
 
   // Search options
   const [searchOptions, setSearchOptions] = useState<RAGQueryOptions>({
@@ -116,7 +117,14 @@ export default function RAGSearch({ documentGroups = [], onResultSelect }: RAGSe
     return Math.round(score * 100);
   };
 
-  const ResultCard = ({ result }: { result: SearchResult }) => (
+  const ResultCard = ({ result }: { result: SearchResult }) => {
+    const isPaperQA = result.chunk.metadata?.analysis_type === 'paperqa';
+    const isExpanded = expandedResults.has(result.chunk.id);
+    const content = result.chunk.content;
+    const shouldTruncate = isPaperQA && content.length > 500 && !isExpanded;
+    const displayContent = shouldTruncate ? content.substring(0, 500) + '...' : content;
+
+    return (
     <Card className="hover:shadow-md transition-all cursor-pointer" onClick={() => onResultSelect?.(result)}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
@@ -153,8 +161,38 @@ export default function RAGSearch({ documentGroups = [], onResultSelect }: RAGSe
       
       <CardContent className="pt-0">
         <div className="space-y-3">
-          <div className="text-sm text-gray-600 line-clamp-3">
-            {result.chunk.content}
+          <div className={`text-sm text-gray-600 ${isPaperQA ? '' : 'line-clamp-3'}`}>
+            {displayContent}
+            {shouldTruncate && (
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 h-auto text-blue-600 mt-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedResults(prev => new Set([...prev, result.chunk.id]));
+                }}
+              >
+                Show more
+              </Button>
+            )}
+            {isPaperQA && isExpanded && content.length > 500 && (
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 h-auto text-blue-600 mt-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedResults(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(result.chunk.id);
+                    return newSet;
+                  });
+                }}
+              >
+                Show less
+              </Button>
+            )}
           </div>
           
           <div className="flex items-center justify-between text-xs text-gray-500">
@@ -181,6 +219,7 @@ export default function RAGSearch({ documentGroups = [], onResultSelect }: RAGSe
       </CardContent>
     </Card>
   );
+  };
 
   return (
     <div className="space-y-6">

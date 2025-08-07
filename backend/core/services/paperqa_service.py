@@ -124,7 +124,7 @@ class PaperQAService:
                     year = year_match.group(1).strip()
                     
                     # Flexible regex to find citations like (Author et al., Year)
-                    citation_pattern = re.compile(f"\(.*?{re.escape(author)}[^)]*?{re.escape(year)}.*?\)")
+                    citation_pattern = re.compile(f"\\(.*?{re.escape(author)}[^)]*?{re.escape(year)}.*?\\)")
                     
                     for match in citation_pattern.finditer(answer_text):
                         # Store the exact text that was matched and its corresponding link
@@ -140,3 +140,7 @@ class PaperQAService:
             error_message = f"Error during PaperQA processing: {str(e)}"
             print(error_message)
             return {"answer_text": "", "formatted_evidence": "", "error": error_message} 
+
+
+# Global instance
+paperqa_service = PaperQAService() 
