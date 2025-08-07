@@ -19,11 +19,15 @@ import {
   Brain,
   Download,
   Share,
-  Edit
+  Edit,
+  MessageSquare,
+  Zap
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { ResearchMission, mockMissions, MissionStatus } from '@/lib/types';
 import { createMockResearchReport, ResearchReport, ReportStatus } from '@/lib/types/research-report';
+import { AgentChat, ChatProvider, useFileManager } from '@/components/chat';
+import { AgentType, ChatMessage, ChatFile } from '@/types/chat';
 
 export default function MissionDetails() {
   const params = useParams();
@@ -31,6 +35,14 @@ export default function MissionDetails() {
   const [mission, setMission] = useState<ResearchMission | null>(null);
   const [researchReport, setResearchReport] = useState<ResearchReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
+  const [availableFiles, setAvailableFiles] = useState<ChatFile[]>([]);
+  const [generatedFiles, setGeneratedFiles] = useState<ChatFile[]>([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const { files, addFile, addGeneratedFile } = useFileManager();
 
   useEffect(() => {
     // Find mission by ID from mock data
@@ -46,6 +58,133 @@ export default function MissionDetails() {
     }
     setIsLoading(false);
   }, [params.id]);
+
+  // Agent definitions
+  const agents: AgentType[] = [
+    {
+      id: 'planning',
+      name: 'Planning Agent',
+      description: 'Creates research plans and outlines',
+      color: 'blue',
+      icon: 'target'
+    },
+    {
+      id: 'research',
+      name: 'Research Agent',
+      description: 'Conducts in-depth research and analysis',
+      color: 'green',
+      icon: 'brain'
+    },
+    {
+      id: 'writing',
+      name: 'Writing Agent',
+      description: 'Writes and drafts research reports',
+      color: 'purple',
+      icon: 'file-edit'
+    },
+    {
+      id: 'review',
+      name: 'Review Agent',
+      description: 'Reviews and refines final reports',
+      color: 'orange',
+      icon: 'users'
+    }
+  ];
+
+  // Chat handlers
+  const handleAgentSelect = (agent: AgentType) => {
+    setSelectedAgent(agent);
+  };
+
+  const handleAgentExecute = async (agent: AgentType, message: string, files: File[]) => {
+    setIsChatLoading(true);
+    
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: message,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    try {
+      // Simulate agent execution (in real implementation, this would call your backend)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Generate mock response based on agent type
+      let response = '';
+      let generatedFileName = '';
+      
+      switch (agent.id) {
+        case 'planning':
+          response = `I've created a comprehensive research plan based on your request: "${message}".\n\nThe plan includes:\n1. Research objectives and scope\n2. Methodology approach\n3. Timeline and milestones\n4. Resource requirements\n\nThe plan has been saved and is ready for your review.`;
+          generatedFileName = `planning-output-${Date.now()}.md`;
+          break;
+        case 'research':
+          response = `Research completed for the specified task. I've analyzed the available resources and gathered relevant information.\n\nKey findings:\n- Identified 15 relevant sources\n- Extracted key insights and data points\n- Organized information by thematic categories\n\nThe research data has been compiled and is ready for the writing phase.`;
+          generatedFileName = `research-output-${Date.now()}.md`;
+          break;
+        case 'writing':
+          response = `Draft report has been generated based on the research findings. The document includes:\n\n- Executive summary\n- Introduction and background\n- Methodology\n- Results and analysis\n- Conclusions and recommendations\n\nThe draft maintains academic standards and follows the requested structure.`;
+          generatedFileName = `writing-output-${Date.now()}.md`;
+          break;
+        case 'review':
+          response = `Review completed. I've checked the document for:\n\n✓ Content accuracy and completeness\n✓ Logical flow and structure\n✓ Grammar and style consistency\n✓ Citation formatting\n✓ Overall coherence\n\nThe document has been refined and is ready for final submission.`;
+          generatedFileName = `review-output-${Date.now()}.md`;
+          break;
+      }
+
+      // Add agent response
+      const agentMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: response,
+        timestamp: new Date(),
+        agentId: agent.id,
+        agentName: agent.name,
+        agentIcon: agent.icon,
+        metadata: {
+          agentId: agent.id,
+          agentName: agent.name,
+        }
+      };
+      setMessages(prev => [...prev, agentMessage]);
+
+      // Create generated file
+      const generatedContent = `# ${generatedFileName}\n\nGenerated by ${agent.name}\n\n${response}\n\n---\nGenerated at: ${new Date().toISOString()}`;
+      const generatedFile = addGeneratedFile(generatedFileName, generatedContent, agent.name);
+      setGeneratedFiles(prev => [...prev, generatedFile]);
+
+    } catch (error) {
+      console.error('Agent execution failed:', error);
+      
+      // Add error message
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error while processing your request. Please try again.',
+        timestamp: new Date(),
+        agentId: agent.id,
+        agentName: agent.name,
+        agentIcon: agent.icon,
+        metadata: {
+          agentId: agent.id,
+          agentName: agent.name,
+          error: true,
+        }
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  const handleFileSelect = (files: File[]) => {
+    // Add files to available files
+    const newChatFiles = files.map(file => addFile(file, 'upload'));
+    setAvailableFiles(prev => [...prev, ...newChatFiles]);
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -217,8 +356,9 @@ export default function MissionDetails() {
   }
 
   return (
-    <MainLayout>
-      <div className="p-8">
+    <ChatProvider>
+      <MainLayout>
+        <div className="p-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
@@ -311,6 +451,8 @@ export default function MissionDetails() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="progress">Progress</TabsTrigger>
             <TabsTrigger value="agents">Agents</TabsTrigger>
+            <TabsTrigger value="agent-chat">Agent Chat</TabsTrigger>
+            <TabsTrigger value="prompt-opt">Prompt Opt</TabsTrigger>
             <TabsTrigger value="report">Research Report</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
           </TabsList>
@@ -564,6 +706,55 @@ export default function MissionDetails() {
                         {mission.status === MissionStatus.COMPLETED ? 'Completed' : 'Pending'}
                       </Badge>
                     </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="agent-chat" className="space-y-6">
+            <Card className="h-[calc(100vh-12rem)]">
+              <CardHeader className="pb-4">
+                <CardTitle>Agent Chat</CardTitle>
+                <CardDescription>
+                  Control AI agents step-by-step to build your research report
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 h-[calc(100%-8rem)]">
+                <AgentChat
+                  messages={messages}
+                  agents={agents}
+                  selectedAgent={selectedAgent}
+                  onAgentSelect={handleAgentSelect}
+                  onAgentExecute={handleAgentExecute}
+                  availableFiles={[...files, ...availableFiles]}
+                  generatedFiles={generatedFiles}
+                  isLoading={isChatLoading}
+                  onFileSelect={handleFileSelect}
+                  placeholder="Select an agent and type instructions... Use @ to reference files"
+                  className="h-full border-0 rounded-none"
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="prompt-opt" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Prompt Optimization</CardTitle>
+                <CardDescription>
+                  Optimize AI prompts using genetic-evolutionary algorithms for this mission
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="text-center py-8">
+                    <Zap className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Prompt Optimization</h3>
+                    <p className="text-gray-600 mb-4">
+                      Use GEPA to optimize prompts for better research results
+                    </p>
+                    <Button>Start Optimization</Button>
                   </div>
                 </div>
               </CardContent>
@@ -859,5 +1050,6 @@ export default function MissionDetails() {
         </Tabs>
       </div>
     </MainLayout>
+    </ChatProvider>
   );
 }

@@ -51,10 +51,14 @@ export default function DocumentLibrary() {
 
   const loadDocumentGroups = async () => {
     try {
-      const groups = await documentService.getUserDocumentGroups('demo-user');
+      const response = await documentService.getUserDocumentGroups('demo-user');
+      // Extract the data array from the backend response
+      const groups = response.data || response;
       setDocumentGroups(groups);
     } catch (error) {
       console.error('Failed to load document groups:', error);
+      // Set empty array as fallback
+      setDocumentGroups([]);
     }
   };
 

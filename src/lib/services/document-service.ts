@@ -233,7 +233,7 @@ export class DocumentService {
       params.append('missionId', missionId);
     }
 
-    const response = await fetch(`/api/document-groups?${params.toString()}`);
+    const response = await fetch(`http://localhost:8000/api/v1/document-groups?${params.toString()}`);
     
     if (!response.ok) {
       throw new Error('Failed to fetch document groups');

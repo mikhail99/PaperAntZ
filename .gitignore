@@ -191,3 +191,13 @@ model_cache/
 # Local configuration overrides
 config.local.*
 settings.local.*
+# Chroma DB data directory
+backend/data/chroma_db/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so

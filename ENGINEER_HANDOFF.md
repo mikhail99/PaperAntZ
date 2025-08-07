@@ -1,15 +1,22 @@
 # AI Research Assistant - Engineer Handoff Documentation
 
+## Recent Updates
+- **Added**: Comprehensive Workflows and Usage Guide (Section 5) covering DSPy-GEPA framework implementation
+- **Added**: Detailed examples of BasePromptModule, GEPA optimization, and parameter management
+- **Added**: Research mission workflows, document processing pipelines, and optimization best practices
+- **Added**: Performance monitoring and analytics patterns
+
 ## Table of Contents
 1. [Project Overview](#project-overview)
 2. [Architecture Overview](#architecture-overview)
 3. [Current Implementation Status](#current-implementation-status)
 4. [Missing Implementation & Mock Code](#missing-implementation--mock-code)
-5. [Local Machine Migration Guide](#local-machine-migration-guide)
-6. [Development Setup](#development-setup)
-7. [Key Technical Decisions](#key-technical-decisions)
-8. [Known Issues & Limitations](#known-issues--limitations)
-9. [Future Development Roadmap](#future-development-roadmap)
+5. [Workflows and Usage Guide](#workflows-and-usage-guide)
+6. [Local Machine Migration Guide](#local-machine-migration-guide)
+7. [Development Setup](#development-setup)
+8. [Key Technical Decisions](#key-technical-decisions)
+9. [Known Issues & Limitations](#known-issues--limitations)
+10. [Future Development Roadmap](#future-development-roadmap)
 
 ---
 
@@ -461,6 +468,537 @@ export class AgentCoordinator {
   }
 }
 ```
+
+---
+
+## Workflows and Usage Guide
+
+### Overview of Workflows
+
+The AI Research Assistant implements several key workflows that leverage the DSPy-GEPA (Genetic-Evolutionary Prompt Architecture) framework. These workflows are designed to optimize AI agent performance through systematic prompt engineering and parameter management.
+
+### Core Workflow Components
+
+#### 1. Base Module System (`src/lib/dspy-gepa/base_module.py`)
+
+The `BasePromptModule` class provides the foundation for all AI agents in the system. It implements:
+
+**Key Features:**
+- **Prompt Parameter Management**: Register, update, and track prompt parameters
+- **Learning Control**: Enable/disable learning and set learning modes
+- **Performance Tracking**: Record execution metrics and optimization history
+- **PyTorch-like API**: Familiar `parameters()`, `named_parameters()`, and `modules()` methods
+
+**Basic Usage:**
+```python
+class MyAgent(BasePromptModule):
+    def __init__(self):
+        super().__init__()
+        
+        # Register DSPy modules
+        self.analyzer = dspy.Predict("text -> analysis")
+        self.summarizer = dspy.Predict("analysis -> summary")
+        
+        # Register prompts for optimization
+        self.register_prompt("analysis_prompt", 
+            "Analyze the following text in detail.")
+        self.register_prompt("summary_prompt",
+            "Summarize the analysis concisely.")
+        
+        # Apply prompts to modules
+        self._apply_prompts()
+    
+    def forward(self, text: str) -> dspy.Prediction:
+        analysis = self.analyzer(text=text)
+        summary = self.summarizer(analysis=analysis.analysis)
+        return dspy.Prediction(analysis=analysis.analysis, summary=summary.summary)
+```
+
+**Parameter Management:**
+```python
+# Access parameters
+for name, param in agent.named_parameters():
+    print(f"{name}: {param.value}")
+
+# Update prompts
+agent.update_prompt("analysis_prompt", 
+    "Analyze the following text with focus on key insights.")
+
+# Export/import prompts
+prompts = agent.get_prompt_dict()
+agent.load_prompt_dict(prompts)
+
+# Learning control
+agent.enable_learning(True)
+agent.set_learning_mode(LearningMode.HYBRID)
+agent.freeze_prompt("summary_prompt")  # Prevent optimization
+```
+
+#### 2. GEPA Optimization Workflow (`src/lib/dspy-gepa/gepa_optimizer.py`)
+
+The GEPA (Genetic-Evolutionary Prompt Architecture) optimizer implements a sophisticated prompt optimization system using genetic algorithms and natural language reflection.
+
+**Key Features:**
+- **Population-based Optimization**: Maintains multiple prompt variations
+- **Genetic Operations**: Crossover, mutation, and selection
+- **Natural Language Reflection**: Uses LLM to analyze and improve prompts
+- **Adaptive Learning**: Adjusts optimization strategy based on performance
+
+**Optimization Workflow:**
+```python
+# Create optimizer configuration
+config = GEPAConfig(
+    population_size=15,
+    generations=8,
+    mutation_rate=0.4,
+    crossover_rate=0.7,
+    reflection_model="gemini-1.5-flash"
+)
+
+optimizer = GEPAOptimizer(config)
+
+# Define evaluation function
+async def evaluate_module(module: BasePromptModule) -> float:
+    # Run test tasks and measure performance
+    results = await run_test_tasks(module)
+    return calculate_performance_score(results)
+
+# Run optimization
+optimized_module = await optimizer.optimize_module(
+    my_module,
+    evaluation_fn=evaluate_module
+)
+```
+
+**Optimization Process:**
+1. **Initial Population Creation**: Generate variations of initial prompts
+2. **Fitness Evaluation**: Test each variation on benchmark tasks
+3. **Selection**: Choose best performers using tournament selection
+4. **Crossover**: Combine successful prompts to create offspring
+5. **Mutation**: Introduce controlled variations
+6. **Reflection**: Use LLM to analyze performance and suggest improvements
+7. **Iteration**: Repeat for specified generations or until convergence
+
+#### 3. Parameter Management Workflow (`src/lib/dspy-gepa/parameter.py`)
+
+The `PromptParameter` class tracks the lifecycle of each prompt parameter through optimization cycles.
+
+**Key Features:**
+- **State Management**: ACTIVE, FROZEN, ARCHIVED states
+- **Optimization History**: Complete record of all changes and performance impacts
+- **Performance Metrics**: Track accuracy, relevance, efficiency, etc.
+- **Metadata Support**: Custom annotations and documentation
+
+**Parameter Lifecycle:**
+```python
+# Create parameter
+param = PromptParameter(
+    name="research_prompt",
+    value="Conduct thorough research on the topic",
+    path="ResearchAgent.research_prompt",
+    module=research_agent
+)
+
+# Record optimization
+param.record_optimization(
+    old_prompt="Conduct thorough research on the topic",
+    new_prompt="Conduct comprehensive research focusing on key insights and evidence",
+    performance_change=0.15,  # 15% improvement
+    method="GEPA",
+    metadata={"generation": 3, "population_size": 15}
+)
+
+# Update metrics
+param.update_metrics({
+    'accuracy': 0.92,
+    'relevance': 0.88,
+    'efficiency': 0.85
+})
+
+# Freeze parameter (prevent further optimization)
+param.freeze()
+```
+
+### Research Mission Workflow
+
+#### 1. Mission Creation and Planning
+
+```python
+async def create_research_mission(question: str, documents: List[str]) -> ResearchMission:
+    # Create mission instance
+    mission = ResearchMission(
+        question=ResearchQuestion(text=question),
+        documents=documents,
+        status="PLANNING"
+    )
+    
+    # Initialize planning agent
+    planning_agent = PlanningAgent()
+    
+    # Generate research plan
+    research_plan = await planning_agent.create_plan(question)
+    
+    # Optimize planning prompts using GEPA
+    optimized_planner = await optimize_prompt_with_gepa(
+        planning_agent,
+        evaluate_planning_performance,
+        config=create_gepa_config(generations=5)
+    )
+    
+    mission.plan = research_plan
+    return mission
+```
+
+#### 2. Research Execution Workflow
+
+```python
+async def execute_research_mission(mission: ResearchMission) -> ResearchReport:
+    # Phase 1: Research with iterative refinement
+    research_agent = ResearchAgent()
+    reflection_agent = ReflectionAgent()
+    
+    research_notes = []
+    plan_revision_count = 0
+    
+    while plan_revision_count < 3:
+        # Execute research
+        notes = await research_agent.executeResearch(
+            mission.plan, 
+            mission.documents
+        )
+        research_notes.extend(notes)
+        
+        # Reflect on research quality
+        reflection = await reflection_agent.reflectOnResearch(
+            research_notes, 
+            mission.plan
+        )
+        
+        if not reflection.needsMoreResearch:
+            break
+            
+        # Revise plan based on reflection
+        mission.plan = await planning_agent.revisePlan(
+            mission.plan, 
+            reflection.gaps
+        )
+        plan_revision_count += 1
+    
+    # Phase 2: Report generation
+    writing_agent = WritingAgent()
+    report_draft = await writing_agent.generateReport(
+        research_notes, 
+        mission.plan
+    )
+    
+    # Phase 3: Report refinement
+    for _ in range(2):  # Max 2 revisions
+        reflection = await reflection_agent.reflectOnWriting(report_draft)
+        if reflection.needsRevision:
+            report_draft = await writing_agent.reviseReport(
+                report_draft, 
+                reflection.feedback
+            )
+        else:
+            break
+    
+    return ResearchReport(
+        question=mission.question,
+        plan=mission.plan,
+        findings=research_notes,
+        synthesis=report_draft.synthesis,
+        conclusion=report_draft.conclusion
+    )
+```
+
+### Document Processing Workflow
+
+#### 1. Document Upload and Processing
+
+```python
+async def process_document_pipeline(document_id: str) -> None:
+    # Get document from database
+    document = await prisma.document.findUnique(
+        where={"id": document_id}
+    )
+    
+    # Parse document content
+    parsed_content = await document_parser.parse(document)
+    
+    # Chunk document
+    chunks = await chunker.chunk(parsed_content)
+    
+    # Generate embeddings
+    for chunk in chunks:
+        embedding = await ai_model.generateEmbedding(chunk.content)
+        
+        # Store chunk with embedding
+        await prisma.documentChunk.create({
+            "documentId": document_id,
+            "content": chunk.content,
+            "chunkIndex": chunk.index,
+            "embedding": JSON.stringify(embedding)
+        })
+    
+    # Mark as processed
+    await prisma.document.update({
+        "where": {"id": document_id},
+        "data": {"processed": True}
+    })
+```
+
+#### 2. RAG Search Workflow
+
+```python
+async def rag_search_workflow(query: str, document_group_id: str) -> List[RAGResult]:
+    # Generate query embedding
+    query_embedding = await ai_model.generateEmbedding(query)
+    
+    # Search for relevant chunks
+    chunks = await prisma.documentChunk.findMany({
+        "where": {
+            "document": {
+                "documentGroups": {
+                    "some": {
+                        "documentGroupId": document_group_id
+                    }
+                }
+            }
+        },
+        "include": {"document": True}
+    })
+    
+    # Calculate similarity scores
+    results = []
+    for chunk in chunks:
+        chunk_embedding = JSON.parse(chunk.embedding or "[]")
+        similarity = calculate_cosine_similarity(query_embedding, chunk_embedding)
+        
+        results.append({
+            "chunkId": chunk.id,
+            "documentId": chunk.documentId,
+            "content": chunk.content,
+            "relevanceScore": similarity,
+            "metadata": {
+                "documentTitle": chunk.document.title,
+                "chunkIndex": chunk.chunkIndex
+            }
+        })
+    
+    # Sort by relevance and return top results
+    return sorted(results, key=lambda x: x["relevanceScore"], reverse=True)[:10]
+```
+
+### Optimization Workflow Best Practices
+
+#### 1. Setting Up Optimization Sessions
+
+```python
+async def setup_optimization_session(
+    target_module: BasePromptModule,
+    evaluation_fn: AsyncEvaluationFunction,
+    config: Optional[GEPAConfig] = None
+) -> str:
+    # Create default config if not provided
+    if config is None:
+        config = create_gepa_config(
+            population_size=10,
+            generations=5,
+            mutation_rate=0.3
+        )
+    
+    # Create optimization session
+    session = await prisma.optimizationSession.create({
+        "data": {
+            "moduleId": target_module.__class__.__name__,
+            "config": JSON.stringify(config.to_dict()),
+            "status": "PENDING",
+            "createdAt": datetime.now()
+        }
+    })
+    
+    # Start optimization in background
+    asyncio.create_task(run_optimization_background(session.id, target_module, evaluation_fn))
+    
+    return session.id
+```
+
+#### 2. Monitoring Optimization Progress
+
+```python
+async def monitor_optimization(session_id: str) -> Dict[str, Any]:
+    session = await prisma.optimizationSession.findUnique({
+        "where": {"id": session_id}
+    })
+    
+    if not session:
+        raise ValueError("Session not found")
+    
+    # Parse optimization history
+    history = JSON.parse(session.history or "[]")
+    
+    return {
+        "sessionId": session_id,
+        "status": session.status,
+        "currentGeneration": session.generationsCompleted,
+        "bestFitness": session.bestFitness,
+        "progress": session.generationsCompleted / config.generations,
+        "history": history,
+        "estimatedTimeRemaining": calculate_estimated_time(session)
+    }
+```
+
+#### 3. Applying Optimized Prompts
+
+```python
+async def apply_optimized_prompts(
+    session_id: str,
+    target_module: BasePromptModule
+) -> None:
+    # Get optimization results
+    session = await prisma.optimizationSession.findUnique({
+        "where": {"id": session_id},
+        "include": {
+            "optimizationRecords": {
+                "orderBy": {"timestamp": "desc"}
+            }
+        }
+    })
+    
+    # Apply best performing prompts
+    for record in session.optimizationRecords:
+        if record.performance_change > 0:  # Only apply improvements
+            target_module.update_prompt(
+                record.parameterName,
+                record.newPrompt,
+                record_optimization=False  # Don't re-record
+            )
+    
+    # Mark session as applied
+    await prisma.optimizationSession.update({
+        "where": {"id": session_id},
+        "data": {"status": "APPLIED"}
+    })
+```
+
+### Workflow Integration Patterns
+
+#### 1. Sequential Workflow
+
+```python
+async def sequential_research_workflow(question: str, documents: List[str]) -> ResearchReport:
+    # Step 1: Create mission
+    mission = await create_research_mission(question, documents)
+    
+    # Step 2: Execute research
+    report = await execute_research_mission(mission)
+    
+    # Step 3: Optimize agents based on performance
+    await optimize_agents_performance(mission.agents, report)
+    
+    return report
+```
+
+#### 2. Parallel Workflow
+
+```python
+async def parallel_research_workflow(questions: List[str]) -> List[ResearchReport]:
+    # Execute multiple research missions in parallel
+    tasks = []
+    for question in questions:
+        task = asyncio.create_task(
+            sequential_research_workflow(question, get_relevant_documents(question))
+        )
+        tasks.append(task)
+    
+    # Wait for all to complete
+    reports = await asyncio.gather(*tasks)
+    return reports
+```
+
+#### 3. Event-Driven Workflow
+
+```python
+async def event_driven_optimization():
+    # Listen for performance events
+    async for event in performance_event_stream:
+        if event.type == "performance_drop":
+            # Trigger optimization when performance drops
+            await setup_optimization_session(
+                event.module,
+                create_evaluation_function(event.task_type),
+                config=create_gepa_config(generations=3)  # Quick optimization
+            )
+        elif event.type == "mission_completed":
+            # Analyze performance and schedule deep optimization
+            await schedule_deep_optimization(event.mission_id)
+```
+
+### Performance Monitoring and Analytics
+
+#### 1. Tracking Workflow Performance
+
+```python
+async def track_workflow_performance(workflow_id: str) -> Dict[str, Any]:
+    # Get workflow execution data
+    executions = await prisma.workflowExecution.findMany({
+        "where": {"workflowId": workflow_id},
+        "orderBy": {"startTime": "desc"},
+        "take": 100
+    })
+    
+    # Calculate metrics
+    total_executions = len(executions)
+    successful_executions = len([e for e in executions if e.status == "COMPLETED"])
+    average_duration = sum(e.duration for e in executions) / total_executions
+    
+    return {
+        "workflowId": workflow_id,
+        "totalExecutions": total_executions,
+        "successRate": successful_executions / total_executions,
+        "averageDuration": average_duration,
+        "recentPerformance": executions[:10]  # Last 10 executions
+    }
+```
+
+#### 2. Optimization Impact Analysis
+
+```python
+async def analyze_optimization_impact(session_id: str) -> Dict[str, Any]:
+    session = await prisma.optimizationSession.findUnique({
+        "where": {"id": session_id},
+        "include": {"optimizationRecords": True}
+    })
+    
+    # Calculate performance improvements
+    total_improvement = sum(
+        record.performanceChange 
+        for record in session.optimizationRecords
+        if record.performanceChange > 0
+    )
+    
+    # Analyze by parameter
+    parameter_impacts = {}
+    for record in session.optimizationRecords:
+        if record.parameterName not in parameter_impacts:
+            parameter_impacts[record.parameterName] = []
+        parameter_impacts[record.parameterName].append(record.performanceChange)
+    
+    return {
+        "sessionId": session_id,
+        "totalImprovement": total_improvement,
+        "generationsCompleted": session.generationsCompleted,
+        "parameterImpacts": {
+            param: {
+                "averageImprovement": sum(improvements) / len(improvements),
+                "optimizationCount": len(improvements)
+            }
+            for param, improvements in parameter_impacts.items()
+        }
+    }
+```
+
+This workflow system provides a comprehensive framework for AI agent optimization, research execution, and performance monitoring. The key innovation is the integration of genetic-evolutionary optimization with natural language reflection, allowing for systematic improvement of AI agent performance through automated prompt engineering.
 
 ---
 

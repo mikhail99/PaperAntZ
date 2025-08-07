@@ -21,11 +21,29 @@ import {
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { ResearchMission, mockMissions, MissionStatus } from '@/lib/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function ResearchWorkspace() {
   const router = useRouter();
   const [missions, setMissions] = useState<ResearchMission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newMission, setNewMission] = useState({
+    title: '',
+    description: '',
+    documentLibrary: ''
+  });
 
   useEffect(() => {
     // Use mock data
@@ -71,6 +89,22 @@ export default function ResearchWorkspace() {
     }, 2000);
   };
 
+  const handleCreateMission = () => {
+    if (newMission.title.trim()) {
+      const mission: ResearchMission = {
+        id: Date.now().toString(),
+        title: newMission.title,
+        description: newMission.description,
+        status: MissionStatus.CREATED,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      setMissions(prev => [mission, ...prev]);
+      setNewMission({ title: '', description: '', documentLibrary: '' });
+      setIsDialogOpen(false);
+    }
+  };
+
   const activeMission = missions.find(m => m.status === MissionStatus.RESEARCHING || m.status === MissionStatus.WRITING);
 
   return (
@@ -97,10 +131,51 @@ export default function ResearchWorkspace() {
                   Your research projects and their current status
                 </p>
               </div>
-              <Button onClick={() => router.push('/research')}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Mission
-              </Button>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Mission
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Create New Research Mission</DialogTitle>
+                    <DialogDescription>
+                      Create a new research mission. You can select a document library after creation.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="title" className="text-right">
+                        Title
+                      </Label>
+                      <Input
+                        id="title"
+                        value={newMission.title}
+                        onChange={(e) => setNewMission(prev => ({ ...prev, title: e.target.value }))}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="description" className="text-right">
+                        Description
+                      </Label>
+                      <Textarea
+                        id="description"
+                        value={newMission.description}
+                        onChange={(e) => setNewMission(prev => ({ ...prev, description: e.target.value }))}
+                        className="col-span-3"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleCreateMission}>
+                      Create Mission
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

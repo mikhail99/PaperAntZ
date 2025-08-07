@@ -25,18 +25,6 @@ export default function Home() {
       action: () => router.push('/research')
     },
     {
-      icon: MessageSquare,
-      title: 'Agent Chat',
-      description: 'Chat with specialized AI agents for planning, research, and analysis',
-      action: () => router.push('/chat')
-    },
-    {
-      icon: Zap,
-      title: 'Prompt Optimization',
-      description: 'Optimize AI prompts using genetic-evolutionary algorithms',
-      action: () => router.push('/optimization')
-    },
-    {
       icon: Library,
       title: 'Document Library',
       description: 'Organize and analyze your research documents',
@@ -83,7 +71,7 @@ export default function Home() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-16">
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3 mb-16">
           {features.map((feature, index) => (
             <Card key={index} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => {
               console.log(`${feature.title} card clicked`);

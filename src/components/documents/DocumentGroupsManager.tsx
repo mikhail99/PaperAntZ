@@ -78,10 +78,14 @@ export default function DocumentGroupsManager({ onGroupSelect, selectedGroupId }
   const loadGroups = async () => {
     try {
       setLoading(true);
-      const userGroups = await documentService.getUserDocumentGroups(currentUser.id);
+      const response = await documentService.getUserDocumentGroups(currentUser.id);
+      // Extract the data array from the backend response
+      const userGroups = response.data || response;
       setGroups(userGroups);
     } catch (error) {
       console.error('Failed to load document groups:', error);
+      // Set empty array as fallback
+      setGroups([]);
     } finally {
       setLoading(false);
     }
