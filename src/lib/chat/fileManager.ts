@@ -36,13 +36,15 @@ export class FileManager {
 
   // Add a generated file from agent output
   addGeneratedFile(
-    name: string, 
-    content: string, 
+    name: string,
+    content: string,
     generatedBy: string,
-    type: string = 'text/markdown'
+    type: string = 'text/markdown',
+    providedId?: string,
+    url?: string,
   ): ChatFile {
     const chatFile: ChatFile = {
-      id: this.generateFileId(),
+      id: providedId || this.generateFileId(),
       name,
       type,
       size: new Blob([content]).size,
@@ -50,6 +52,10 @@ export class FileManager {
       uploadedAt: new Date(),
       source: 'generated',
       generatedBy,
+    }
+
+    if (url) {
+      chatFile.url = url
     }
 
     this.files.set(chatFile.id, chatFile)
@@ -188,8 +194,8 @@ export function useFileManager() {
     return chatFile
   }, [fileManager, refreshFiles])
 
-  const addGeneratedFile = useCallback((name: string, content: string, generatedBy: string, type?: string) => {
-    const chatFile = fileManager.addGeneratedFile(name, content, generatedBy, type)
+  const addGeneratedFile = useCallback((name: string, content: string, generatedBy: string, type?: string, providedId?: string) => {
+    const chatFile = fileManager.addGeneratedFile(name, content, generatedBy, type, providedId)
     refreshFiles()
     return chatFile
   }, [fileManager, refreshFiles])

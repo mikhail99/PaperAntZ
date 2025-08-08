@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { AgentChat, ChatProvider, useFileManager } from '@/components/chat';
-import { AgentType, ChatMessage, ChatFile } from '@/types/chat';
+import { AgentType, ChatMessage, ChatFile, FileContext } from '@/types/chat';
 import { IdeaMission, MissionStatus } from '@/lib/types';
 import { ideaService } from '@/lib/services/idea-service';
 import { ideaAgentService } from '@/lib/services/idea-agent-service';
@@ -32,6 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import React from 'react';
 
 export default function IdeaMissionDetail() {
   const params = useParams();
@@ -45,6 +46,7 @@ export default function IdeaMissionDetail() {
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
   const [availableFiles, setAvailableFiles] = useState<ChatFile[]>([]);
   const [generatedFiles, setGeneratedFiles] = useState<ChatFile[]>([]);
+  const [artifacts, setArtifacts] = useState<any[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const { files, addFile, addGeneratedFile } = useFileManager();
   const { toast } = useToast();
@@ -54,6 +56,13 @@ export default function IdeaMissionDetail() {
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState('note');
   const [addContent, setAddContent] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editNewName, setEditNewName] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editPrompt, setEditPrompt] = useState('');
+  const [editPreview, setEditPreview] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -84,6 +93,35 @@ export default function IdeaMissionDetail() {
           metadata: m.metadata,
         }));
         setMessages(mappedChat);
+
+        // Load artifacts to show under Available Files
+        const arts = await ideaAgentService.listArtifacts(missionId);
+        setArtifacts(arts);
+        // For now we don't fetch artifact file contents; present as downloadable items.
+        const mappedArtifacts: ChatFile[] = (arts || []).map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          type: 'text/markdown',
+          size: a.size || 0,
+          uploadedAt: new Date(a.createdAt),
+          source: 'generated',
+          generatedBy: a.agent || 'Agent',
+          content: undefined,
+          metadata: a.metadata || {},
+          url: a.downloadUrl,
+        }));
+        setGeneratedFiles(mappedArtifacts);
+        setAvailableFiles(prev => [...prev, ...mappedArtifacts]);
+
+        // Load persisted file context (selection + prompts) and seed local UI state
+        try {
+          const contexts = await ideaAgentService.getFileContext(missionId);
+          // Map to fileId -> { selected, prompt }
+          const ctxMap: Record<string, { selected: boolean; prompt: string }> = {}
+          contexts.forEach((c: any) => { ctxMap[c.id] = { selected: !!c.selected, prompt: c.prompt || '' } })
+          // Attach to window for AgentChat to optionally read (simple approach without lifting state fully)
+          ;(window as any).__seedFileContext = ctxMap
+        } catch {}
       } catch (e) {
         console.error('Failed to load idea mission', e);
         setMission(null);
@@ -115,7 +153,7 @@ export default function IdeaMissionDetail() {
 
   const handleAgentSelect = (agent: AgentType) => setSelectedAgent(agent);
 
-  const handleAgentExecute = async (agent: AgentType, message: string, filesInput: File[]) => {
+  const handleAgentExecute = async (agent: AgentType, message: string, filesInput: FileContext[]) => {
     setIsChatLoading(true);
     const userMessage: ChatMessage = { id: Date.now().toString(), role: 'user', content: message, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
@@ -126,6 +164,7 @@ export default function IdeaMissionDetail() {
           userId: 'demo-user',
           message,
           history: messages.map(m => ({ id: m.id, role: m.role, content: m.content })),
+          files: filesInput,
           documentGroupIds: mission?.documentGroupIds || [],
         });
 
@@ -396,6 +435,73 @@ export default function IdeaMissionDetail() {
                   generatedFiles={generatedFiles}
                   isLoading={isChatLoading}
                   onFileSelect={handleFileSelect}
+                  onAddTextFile={() => setAddOpen(true)}
+                  onFileRename={async (fileId, newName) => {
+                    try {
+                      const updated = await ideaAgentService.renameArtifact(missionId, fileId, newName);
+                      setArtifacts(prev => prev.map(a => a.id === fileId ? updated : a));
+                      setGeneratedFiles(prev => prev.map(f => f.id === fileId ? { ...f, name: updated.name } : f));
+                      setAvailableFiles(prev => prev.map(f => f.id === fileId ? { ...f, name: updated.name } : f));
+                      toast({ title: 'Renamed', description: updated.name });
+                    } catch (e) {
+                      toast({ title: 'Rename failed', description: String(e) });
+                    }
+                  }}
+                  onFileDelete={async (fileId) => {
+                    try {
+                      await ideaAgentService.deleteArtifact(missionId, fileId);
+                      setArtifacts(prev => prev.filter(a => a.id !== fileId));
+                      setGeneratedFiles(prev => prev.filter(f => f.id !== fileId));
+                      setAvailableFiles(prev => prev.filter(f => f.id !== fileId));
+                      toast({ title: 'Deleted' });
+                    } catch (e) {
+                      toast({ title: 'Delete failed', description: String(e) });
+                    }
+                  }}
+                  onFileStar={async (fileId, starred) => {
+                    try {
+                      const updated = await ideaAgentService.toggleStar(missionId, fileId, starred);
+                      setArtifacts(prev => prev.map(a => a.id === fileId ? updated : a));
+                      setGeneratedFiles(prev => prev.map(f => f.id === fileId ? { ...f, metadata: { ...(f.metadata||{}), starred } } : f));
+                      setAvailableFiles(prev => prev.map(f => f.id === fileId ? { ...f, metadata: { ...(f.metadata||{}), starred } } : f));
+                    } catch (e) {
+                      toast({ title: 'Update failed', description: String(e) });
+                    }
+                  }}
+                  starredIds={artifacts.filter((a:any)=>a?.metadata?.starred).map((a:any)=>a.id)}
+                  onFileEdit={async (fileId) => {
+                    const f = [...generatedFiles, ...availableFiles].find(x => x.id === fileId)
+                    setEditId(fileId)
+                    setEditName(f?.name || '')
+                    setEditNewName((f?.name || '').replace(/\.[^/.]+$/, ''))
+                    // Prefer in-memory content; if missing but we have a URL, fetch it
+                    let content = (f as any)?.content || ''
+                    try {
+                      if (!content && f?.url) {
+                        // Build absolute URL to backend if needed
+                        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+                        const backendOrigin = apiBase.replace(/\/api\/v1$/, '')
+                        const url = f.url.startsWith('http') ? f.url : `${backendOrigin}${f.url}`
+                        const res = await fetch(url)
+                        if (res.ok) content = await res.text()
+                      }
+                    } catch { /* ignore */ }
+                    setEditContent(content)
+                    // load persisted prompt if available
+                    const seed = (window as any).__seedFileContext || {}
+                    setEditPrompt(seed[fileId]?.prompt || '')
+                    setEditPreview(false)
+                    setEditOpen(true)
+                  }}
+                  onFileContextChange={async (items) => {
+                    try {
+                      await ideaAgentService.putFileContext(missionId, items)
+                      // keep in window seed for subsequent edits
+                      const seed: any = {}
+                      items.forEach((i) => { seed[i.id] = { selected: i.selected, prompt: i.prompt || '' } })
+                      ;(window as any).__seedFileContext = seed
+                    } catch {}
+                  }}
                   onMessageAction={async (message, action) => {
                     try {
                       if (message.role !== 'assistant') return;
@@ -417,6 +523,14 @@ export default function IdeaMissionDetail() {
                   }}
                   placeholder="Select an agent and type instructions... Use @ to reference files"
                   className="h-full border-0 rounded-none"
+                  // Persist selection + prompts whenever user toggles checkbox or edits prompt
+                  onInputChange={async () => {
+                    try {
+                      const seed = (window as any).__seedFileContext || {}
+                      const items = Object.entries(seed).map(([id, cfg]: any) => ({ id, name: (generatedFiles.find(f=>f.id===id)||availableFiles.find(f=>f.id===id))?.name || id, prompt: cfg.prompt || '', selected: !!cfg.selected }))
+                      await ideaAgentService.putFileContext(missionId, items)
+                    } catch {}
+                  }}
                 />
                 <div className="p-3 border-t flex justify-end">
                   <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>Add Text File</Button>
@@ -517,6 +631,8 @@ export default function IdeaMissionDetail() {
             <div className="space-y-3">
               <label className="text-sm">Filename (without extension)</label>
               <Input value={saveName} onChange={(e) => setSaveName(e.target.value)} />
+              <label className="text-sm">Per-file prompt</label>
+              <Input value={editPrompt} onChange={(e)=>setEditPrompt(e.target.value)} placeholder="Optional per-file prompt" />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setSaveOpen(false)}>Cancel</Button>
@@ -532,9 +648,15 @@ export default function IdeaMissionDetail() {
                   });
                   const artifact = res.artifact;
                   const fileName = artifact?.name || `${saveName || 'idea-plan'}.md`;
-                  const added = addGeneratedFile(fileName, saveTarget.content, saveTarget.agentName || 'Agent');
+                  const added = addGeneratedFile(fileName, saveTarget.content, saveTarget.agentName || 'Agent', 'text/markdown', artifact?.id, artifact?.downloadUrl);
                   setGeneratedFiles(prev => [added, ...prev]);
                   setAvailableFiles(prev => [added, ...prev]);
+                  // store prompt selection
+                  const seed = (window as any).__seedFileContext || {}
+                  if (artifact?.id) seed[artifact.id] = { selected: true, prompt: editPrompt }
+                  ;(window as any).__seedFileContext = seed
+                  const items = Object.entries(seed).map(([id, cfg]: any) => ({ id, name: (generatedFiles.find(f=>f.id===id)||availableFiles.find(f=>f.id===id))?.name || id, prompt: cfg.prompt || '', selected: !!cfg.selected }))
+                  await ideaAgentService.putFileContext(missionId, items)
                   toast({ title: 'Saved', description: `${fileName} added to Available Files` });
                 } catch (e) {
                   console.error(e);
@@ -567,7 +689,7 @@ export default function IdeaMissionDetail() {
                   const res = await ideaAgentService.addTextArtifact(missionId, { userId: 'demo-user', name: addName, content: addContent, format: 'markdown' });
                   const artifact = res.artifact;
                   const fileName = artifact?.name || `${addName}.md`;
-                  const added = addGeneratedFile(fileName, addContent, 'External');
+                  const added = addGeneratedFile(fileName, addContent, 'External', 'text/markdown', artifact?.id, artifact?.downloadUrl);
                   setGeneratedFiles(prev => [added, ...prev]);
                   setAvailableFiles(prev => [added, ...prev]);
                   toast({ title: 'Added', description: `${fileName} added to Available Files` });
@@ -579,6 +701,79 @@ export default function IdeaMissionDetail() {
                   setAddContent('');
                 }
               }}>Add</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit artifact (Markdown) */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="sm:max-w-2xl h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Edit file: {editName}</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-auto pr-1">
+              <div>
+                <label className="text-sm">Filename (without extension)</label>
+                <Input value={editNewName} onChange={(e)=>setEditNewName(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm">Per-file prompt</label>
+                <Input value={editPrompt} onChange={(e)=>setEditPrompt(e.target.value)} placeholder="Optional per-file prompt" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant={editPreview ? 'outline' : 'default'} size="sm" onClick={()=>setEditPreview(false)}>Edit</Button>
+                <Button variant={editPreview ? 'default' : 'outline'} size="sm" onClick={()=>setEditPreview(true)}>Preview</Button>
+              </div>
+              {!editPreview ? (
+                <Textarea value={editContent} onChange={(e)=>setEditContent(e.target.value)} className="flex-1 min-h-[300px] font-mono text-sm" />
+              ) : (
+                <div className="prose prose-sm max-w-none p-4 border rounded bg-white overflow-auto">
+                  {React.createElement(require('react-markdown').default, { 
+                    // @ts-ignore
+                    components: {
+                      h1: (props: any) => <h1 className="text-2xl font-bold mb-3" {...props} />,
+                      h2: (props: any) => <h2 className="text-xl font-semibold mt-4 mb-2" {...props} />,
+                      h3: (props: any) => <h3 className="text-lg font-semibold mt-3 mb-2" {...props} />,
+                      p: (props: any) => <p className="mb-2 leading-6" {...props} />,
+                      ul: (props: any) => <ul className="list-disc pl-5 space-y-1 mb-2" {...props} />,
+                      ol: (props: any) => <ol className="list-decimal pl-5 space-y-1 mb-2" {...props} />,
+                      li: (props: any) => <li className="leading-6" {...props} />,
+                      strong: (props: any) => <strong className="font-semibold" {...props} />,
+                      code: (props: any) => <code className="bg-gray-100 px-1 rounded" {...props} />,
+                    }
+                  }, editContent || '')}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={()=>setEditOpen(false)}>Cancel</Button>
+              <Button onClick={async ()=>{
+                if (!editId) return;
+                try {
+                  // If the name changed, rename first
+                  if (editNewName && (editNewName + (editName.match(/\.[^/.]+$/)?.[0] || '')) !== editName) {
+                    const updated = await ideaAgentService.renameArtifact(missionId, editId, editNewName)
+                    setEditName(updated.name)
+                    setGeneratedFiles(prev => prev.map(f => f.id === editId ? { ...f, name: updated.name } : f))
+                    setAvailableFiles(prev => prev.map(f => f.id === editId ? { ...f, name: updated.name } : f))
+                  }
+                  const updated = await ideaAgentService.editArtifactContent(missionId, editId, editContent)
+                  setArtifacts(prev => prev.map(a => a.id === editId ? updated : a))
+                  setGeneratedFiles(prev => prev.map(f => f.id === editId ? { ...f, content: editContent, name: updated.name } : f))
+                  setAvailableFiles(prev => prev.map(f => f.id === editId ? { ...f, content: editContent, name: updated.name } : f))
+                  // persist prompt alongside selection state (assume selected=true if edited here)
+                  const seed = (window as any).__seedFileContext || {}
+                  seed[editId] = { selected: true, prompt: editPrompt }
+                  ;(window as any).__seedFileContext = seed
+                  const items = Object.entries(seed).map(([id, cfg]: any) => ({ id, name: (generatedFiles.find(f=>f.id===id)||availableFiles.find(f=>f.id===id))?.name || id, prompt: cfg.prompt || '', selected: !!cfg.selected }))
+                  await ideaAgentService.putFileContext(missionId, items)
+                  toast({ title: 'Saved', description: 'Content updated' })
+                } catch (e) {
+                  toast({ title: 'Save failed', description: String(e) })
+                } finally {
+                  setEditOpen(false)
+                }
+              }}>Save</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

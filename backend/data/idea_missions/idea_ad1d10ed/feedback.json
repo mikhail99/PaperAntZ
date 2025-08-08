@@ -40,5 +40,19 @@
     "rating": "down",
     "reason": null,
     "timestamp": "2025-08-08T15:39:08.129867"
+  },
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-08T16:13:50.845184"
+  },
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-08T16:13:52.412129"
   }
 ]

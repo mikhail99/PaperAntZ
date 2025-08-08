@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { BaseChat } from './BaseChat'
-import { AgentChatProps, AgentType, ChatFile, FileSuggestion } from '@/types/chat'
+import { AgentChatProps, AgentType, ChatFile, FileSuggestion, FileContext } from '@/types/chat'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -23,7 +23,10 @@ import {
   TargetIcon,
   BrainIcon,
   FileEditIcon,
-  UsersIcon
+  UsersIcon,
+  Pencil,
+  Trash2,
+  Download
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -144,6 +147,17 @@ const getAgentIcon = (iconName: string) => {
   }
 }
 
+// Map generatedBy text to an agent icon
+const getAgentIconByGenerator = (generatedBy?: string) => {
+  if (!generatedBy) return <BotIcon className="h-3.5 w-3.5 text-gray-500" />
+  const name = generatedBy.toLowerCase()
+  if (name.includes('planning')) return <TargetIcon className="h-3.5 w-3.5 text-blue-600" />
+  if (name.includes('research')) return <BrainIcon className="h-3.5 w-3.5 text-green-600" />
+  if (name.includes('writing')) return <FileEditIcon className="h-3.5 w-3.5 text-purple-600" />
+  if (name.includes('review')) return <UsersIcon className="h-3.5 w-3.5 text-orange-600" />
+  return <BotIcon className="h-3.5 w-3.5 text-gray-500" />
+}
+
 export function AgentChat({
   messages,
   onAgentSelect,
@@ -156,11 +170,31 @@ export function AgentChat({
   placeholder = "Select an agent and type instructions... Use @ to reference files",
   className,
   onMessageAction,
+  onFileRename,
+  onFileDelete,
+  onFileStar,
+  starredIds = [],
+  onAddTextFile,
+  onFileEdit,
 }: AgentChatProps) {
   const [inputValue, setInputValue] = useState('')
   const [fileSearchTerm, setFileSearchTerm] = useState('')
   const [showFileSuggestions, setShowFileSuggestions] = useState(false)
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, { selected: boolean; prompt: string }>>({})
+  // expose current selected file context for parent persistence if needed
+  const buildContextItems = useCallback(() => {
+    const fileMap = new Map<string, ChatFile>()
+    availableFiles.forEach(f => fileMap.set(f.id, f))
+    generatedFiles.forEach(f => fileMap.set(f.id, f))
+    return Object.entries(selectedFiles).map(([id, cfg]) => ({
+      id,
+      name: fileMap.get(id)?.name || id,
+      prompt: cfg.prompt,
+      selected: !!cfg.selected,
+    }))
+  }, [availableFiles, generatedFiles, selectedFiles])
+
+  // Parent handles persistence via its own callback; we avoid referencing it here to prevent runtime issues
   const [executedAgents, setExecutedAgents] = useState<Set<string>>(new Set())
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -291,16 +325,31 @@ export function AgentChat({
     }
   }, [selectedSuggestionIndex, showFileSuggestions])
 
+  // Seed selection/prompt state from parent if available (persisted context)
+  useEffect(() => {
+    const seed = (window as any).__seedFileContext
+    if (seed && Object.keys(selectedFiles).length === 0) {
+      setSelectedFiles(seed)
+    }
+  }, [])
+
   // Handle agent execution
   const handleExecuteAgent = useCallback(() => {
     if (!selectedAgent || !inputValue.trim()) return
 
-    const referencedFiles = parseFileReferences(inputValue)
-    const filesToPass = availableFiles.filter(file => 
-      referencedFiles.includes(file.name)
-    )
+    // Build file contexts from selected checkboxes
+    const contexts: FileContext[] = []
+    const fileMap = new Map<string, ChatFile>()
+    availableFiles.forEach(f => fileMap.set(f.id, f))
+    generatedFiles.forEach(f => fileMap.set(f.id, f))
+    for (const [fid, cfg] of Object.entries(selectedFiles)) {
+      if (cfg?.selected) {
+        const f = fileMap.get(fid)
+        if (f) contexts.push({ id: fid, name: f.name, prompt: cfg.prompt, url: f.url })
+      }
+    }
 
-    onAgentExecute(selectedAgent, inputValue, filesToPass.map(f => new File([], f.name)))
+    onAgentExecute(selectedAgent, inputValue, contexts)
     
     // Mark agent as executed
     setExecutedAgents(prev => new Set([...prev, selectedAgent.id]))
@@ -394,8 +443,16 @@ export function AgentChat({
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium flex items-center gap-2">
                 <PaperclipIcon className="h-4 w-4" />
-                Available Files ({availableFiles.length + generatedFiles.length})
+                Available Files ({(() => {
+                  const ids = new Set<string>()
+                  availableFiles.forEach(f => ids.add(f.id))
+                  generatedFiles.forEach(f => ids.add(f.id))
+                  return ids.size
+                })()})
               </h4>
+              {onAddTextFile && (
+                <Button variant="outline" size="sm" onClick={onAddTextFile}>Add Text File</Button>
+              )}
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -413,39 +470,55 @@ export function AgentChat({
                   fileMap.set(file.id, { ...file, displayType: 'generated' })
                 })
                 
-                return Array.from(fileMap.values()).map((file) => (
-                  <div
-                    key={file.id}
+                return Array.from(fileMap.values()).map((file) => {
+                  return (
+                    <div
+                      key={file.id}
                     className={cn(
-                      'p-2 border rounded text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors',
-                      file.displayType === 'generated' && 'bg-green-50 border-green-200 dark:bg-green-900/20',
-                      selectedFiles.includes(file.name) && 'bg-blue-50 border-blue-200 dark:bg-blue-900/20'
-                    )}
-                    onClick={() => {
-                      if (selectedFiles.includes(file.name)) {
-                        setSelectedFiles(prev => prev.filter(f => f !== file.name))
-                      } else {
-                        setSelectedFiles(prev => [...prev, file.name])
-                      }
-                    }}
-                  >
-                    <div className="flex items-center gap-1">
-                      {getFileIcon(file.name)}
-                      <span className="truncate" title={file.name}>
-                        {file.name}
-                      </span>
+                      'relative p-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors',
+                        file.displayType === 'generated' && 'bg-blue-50/30 border-blue-200 dark:bg-blue-900/10',
+                      selectedFiles[file.id]?.selected && 'bg-blue-50 border-blue-200 dark:bg-blue-900/20'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={!!selectedFiles[file.id]?.selected}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            setSelectedFiles(prev => ({
+                              ...prev,
+                              [file.id]: { selected: checked, prompt: prev[file.id]?.prompt || '' }
+                            }))
+                          }}
+                        />
+                        {file.displayType === 'generated' ? (
+                          <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-50">
+                            {getAgentIconByGenerator(file.generatedBy)}
+                          </span>
+                        ) : (
+                          getFileIcon(file.name)
+                        )}
+                        <span className="truncate font-medium" title={file.name}>{file.name}</span>
+                        <div className="ml-auto inline-flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e)=>{e.preventDefault(); e.stopPropagation(); onFileEdit?.(file.id)}}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e)=>{e.preventDefault(); e.stopPropagation();}}>
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-700" onClick={(e)=>{e.preventDefault(); e.stopPropagation(); if (onFileDelete && window.confirm('Delete this file?')) onFileDelete(file.id)}}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{file.displayType === 'generated' ? 'Agent output' : 'Uploaded'}{file.uploadedAt ? ` · ${file.uploadedAt.toLocaleDateString()}` : ''}</span>
+                      </div>
+                      {/* Per-file prompt moved to Edit dialog */}
                     </div>
-                    <div className={cn(
-                      'text-xs',
-                      file.displayType === 'generated' ? 'text-green-600' : 'text-gray-500'
-                    )}>
-                      {file.displayType === 'generated' 
-                        ? `Generated by ${file.generatedBy}` 
-                        : 'Uploaded'
-                      }
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               })()}
             </div>
           </CardContent>

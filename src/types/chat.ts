@@ -32,6 +32,20 @@ export interface ChatFile {
   metadata?: Record<string, any>
 }
 
+export interface FileContext {
+  id: string
+  name: string
+  prompt?: string
+  url?: string
+}
+
+export interface FileSelectionState {
+  id: string
+  name: string
+  selected: boolean
+  prompt?: string
+}
+
 export interface ChatSession {
   id: string
   title: string
@@ -95,12 +109,13 @@ export interface AgentChatProps extends Omit<BaseChatProps, 'onSendMessage'> {
   agents: AgentType[]
   selectedAgent: AgentType | null
   onAgentSelect: (agent: AgentType) => void
-  onAgentExecute: (agent: AgentType, message: string, files: File[]) => void
+  onAgentExecute: (agent: AgentType, message: string, files: FileContext[]) => void
   generatedFiles: ChatFile[]
   onFileRename?: (fileId: string, newName: string) => void
   onFileDelete?: (fileId: string) => void
-  onFileStar?: (fileId: string, starred: boolean) => void
-  starredIds?: string[]
+  onAddTextFile?: () => void
+  onFileEdit?: (fileId: string) => void
+  onFileContextChange?: (items: FileSelectionState[]) => void
 }
 
 export interface DocumentChatProps extends Omit<BaseChatProps, 'onSendMessage'> {

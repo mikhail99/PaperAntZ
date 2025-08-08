@@ -44,6 +44,14 @@ export const ideaAgentService = {
     if (!res.ok || data.success === false) throw new Error(data.error || 'Rename failed');
     return data.data;
   },
+  async editArtifactContent(missionId: string, artifactId: string, content: string) {
+    const res = await fetch(`${API_BASE}/idea-missions/${missionId}/artifacts/${artifactId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content })
+    });
+    const data = await res.json();
+    if (!res.ok || data.success === false) throw new Error(data.error || 'Edit failed');
+    return data.data;
+  },
   async toggleStar(missionId: string, artifactId: string, starred: boolean) {
     const res = await fetch(`${API_BASE}/idea-missions/${missionId}/artifacts/${artifactId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metadata: { starred } })
@@ -81,6 +89,22 @@ export const ideaAgentService = {
     });
     const data = await res.json();
     if (!res.ok || data.success === false) throw new Error(data.error || 'Add artifact failed');
+    return data.data;
+  },
+
+  async getFileContext(missionId: string) {
+    const res = await fetch(`${API_BASE}/idea-missions/${missionId}/file-context`);
+    const data = await res.json();
+    if (!res.ok || data.success === false) throw new Error(data.error || 'Get file context failed');
+    return data.data;
+  },
+
+  async putFileContext(missionId: string, items: Array<{ id: string; name: string; prompt?: string; selected: boolean }>) {
+    const res = await fetch(`${API_BASE}/idea-missions/${missionId}/file-context`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(items)
+    });
+    const data = await res.json();
+    if (!res.ok || data.success === false) throw new Error(data.error || 'Put file context failed');
     return data.data;
   }
 }

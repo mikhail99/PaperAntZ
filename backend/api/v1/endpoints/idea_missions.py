@@ -86,6 +86,8 @@ def _feedback_path(mission_id: str) -> Path:
     return _mission_dir(mission_id) / "feedback.json"
 def _chat_path(mission_id: str) -> Path:
     return _mission_dir(mission_id) / "chat.json"
+def _file_context_path(mission_id: str) -> Path:
+    return _mission_dir(mission_id) / "file_context.json"
 
 def _read_json(path: Path, default):
     if not path.exists():
@@ -189,6 +191,7 @@ class ExecutePlanningRequest(BaseModel):
     history: Optional[List[ChatHistoryItem]] = None
     documentGroupIds: Optional[List[str]] = None
     config: Optional[Dict[str, Any]] = None
+    files: Optional[List[Dict[str, Any]]] = None  # [{id,name,prompt,url}]
 
 @router.post("/idea-missions/{mission_id}/agents/planning/execute")
 async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
@@ -247,12 +250,18 @@ async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
                 def forward(self, instruction: str, context: str):
                     return self.predict(instruction=instruction, context=context)
 
+            # Include file prompts as lightweight context
+            file_context = "\n".join([
+                f"FILE: {f.get('name')}\nPROMPT: {f.get('prompt','')}\nURL: {f.get('url','')}"
+                for f in (req.files or [])
+            ])
             instruction = (
                 "You are a Planning Agent. Brainstorm a structured plan for the user's idea. "
-                "Provide a concise markdown plan with sections: Objectives, Assumptions, Approach, Milestones, Risks, Deliverables."
+                "Provide a concise markdown plan with sections: Objectives, Assumptions, Approach, Milestones, Risks, Deliverables. "
+                "If file prompts are provided, reflect them appropriately in the plan."
             )
             module = PlanningBrainstorm()
-            out = module(instruction=instruction, context=f"User: {req.message}\n\nHistory:\n{context_text}")
+            out = module(instruction=instruction, context=f"User: {req.message}\n\nHistory:\n{context_text}\n\nFiles:\n{file_context}")
             answer = out.plan if hasattr(out, 'plan') else str(out)
             mode = "model"
     except Exception:
@@ -381,12 +390,20 @@ async def save_message_as_artifact(mission_id: str, message_id: str, req: SaveMe
 @router.get("/idea-missions/{mission_id}/artifacts")
 async def list_artifacts(mission_id: str):
     manifest = _read_json(_manifest_path(mission_id), [])
-    return create_success_response(manifest, "Artifacts listed")
+    # Ensure downloadUrl is present for each artifact (older manifests may not have it)
+    enriched = []
+    for rec in manifest:
+        rec = {**rec}
+        if not rec.get("downloadUrl"):
+            rec["downloadUrl"] = f"/api/v1/idea-missions/{mission_id}/files/{rec.get('id')}"
+        enriched.append(rec)
+    return create_success_response(enriched, "Artifacts listed")
 
 
 class UpdateArtifactRequest(BaseModel):
     name: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    content: Optional[str] = None
 
 @router.patch("/idea-missions/{mission_id}/artifacts/{artifact_id}")
 async def update_artifact(mission_id: str, artifact_id: str, req: UpdateArtifactRequest):
@@ -418,6 +435,17 @@ async def update_artifact(mission_id: str, artifact_id: str, req: UpdateArtifact
                     rec['path'] = f"artifacts/{new_filename}"
                 except Exception as e:
                     raise HTTPException(status_code=500, detail=f"Rename failed: {str(e)}")
+            # Update content if provided
+            if req.content is not None:
+                path = _mission_dir(mission_id) / rec.get('path')
+                try:
+                    tmp = path.with_suffix(path.suffix + '.tmp')
+                    tmp.write_text(req.content, encoding='utf-8')
+                    tmp.replace(path)
+                    rec['size'] = len(req.content.encode('utf-8'))
+                    rec['updatedAt'] = get_timestamp()
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Content update failed: {str(e)}")
             _write_json(manifest_path, manifest)
             return create_success_response(rec, "Artifact updated")
     raise HTTPException(status_code=404, detail='Artifact not found')
@@ -458,6 +486,24 @@ async def download_artifact(mission_id: str, file_id: str):
                 raise HTTPException(status_code=404, detail='File not found')
             return FileResponse(str(path), filename=rec.get('name') or 'artifact')
     raise HTTPException(status_code=404, detail='Artifact not found')
+
+
+# --- File contexts (selection + prompts) ---
+class FileContextItem(BaseModel):
+    id: str
+    name: str
+    prompt: Optional[str] = None
+    selected: bool = False
+
+@router.get("/idea-missions/{mission_id}/file-context")
+async def get_file_context(mission_id: str):
+    data = _read_json(_file_context_path(mission_id), [])
+    return create_success_response(data, "File context")
+
+@router.put("/idea-missions/{mission_id}/file-context")
+async def put_file_context(mission_id: str, items: List[FileContextItem]):
+    _write_json(_file_context_path(mission_id), [i.dict() for i in items])
+    return create_success_response({"count": len(items)}, "File context saved")
 
 
 # --- Add external text file ---
