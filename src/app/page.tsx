@@ -11,7 +11,8 @@ import {
   Library,
   ArrowRight,
   Sparkles,
-  MessageSquare
+  MessageSquare,
+  Lightbulb
 } from 'lucide-react';
 
 export default function Home() {
@@ -19,8 +20,14 @@ export default function Home() {
 
   const features = [
     {
+      icon: Lightbulb,
+      title: 'Idea Mission',
+      description: 'Brainstorm and develop ideas with AI assistance',
+      action: () => router.push('/idea-mission')
+    },
+    {
       icon: FileText,
-      title: 'Research Missions',
+      title: 'Project Mission',
       description: 'Create and manage research projects with AI agents',
       action: () => router.push('/research')
     },
@@ -71,7 +78,7 @@ export default function Home() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3 mb-16">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-16">
           {features.map((feature, index) => (
             <Card key={index} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => {
               console.log(`${feature.title} card clicked`);

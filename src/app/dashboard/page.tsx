@@ -17,16 +17,18 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/main-layout';
-import { ResearchMission, OptimizationSession, mockMissions, mockOptimizations } from '@/lib/types';
+import { ResearchMission, OptimizationSession, IdeaMission, mockMissions, mockOptimizations, mockIdeaMissions } from '@/lib/types';
 
 export default function Dashboard() {
   const router = useRouter();
   const [recentMissions, setRecentMissions] = useState<ResearchMission[]>([]);
+  const [recentIdeaMissions, setRecentIdeaMissions] = useState<IdeaMission[]>([]);
   const [recentOptimizations, setRecentOptimizations] = useState<OptimizationSession[]>([]);
 
   useEffect(() => {
     // Use mock data
     setRecentMissions(mockMissions.slice(0, 2));
+    setRecentIdeaMissions(mockIdeaMissions.slice(0, 2));
     setRecentOptimizations(mockOptimizations.slice(0, 2));
   }, []);
 
@@ -47,6 +49,8 @@ export default function Dashboard() {
   const stats = {
     totalMissions: mockMissions.length,
     completedMissions: mockMissions.filter(m => m.status === 'COMPLETED').length,
+    totalIdeaMissions: mockIdeaMissions.length,
+    completedIdeaMissions: mockIdeaMissions.filter(m => m.status === 'COMPLETED').length,
     totalOptimizations: mockOptimizations.length,
     completedOptimizations: mockOptimizations.filter(o => o.status === 'COMPLETED').length,
   };
@@ -78,6 +82,19 @@ export default function Dashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Idea Missions</CardTitle>
+              <Lightbulb className="h-4 w-4 text-gray-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalIdeaMissions}</div>
+              <p className="text-xs text-gray-600">
+                {stats.completedIdeaMissions} completed
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Optimizations</CardTitle>
               <Zap className="h-4 w-4 text-gray-400" />
             </CardHeader>
@@ -96,23 +113,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {Math.round((stats.completedMissions / stats.totalMissions) * 100)}%
+                {Math.round(((stats.completedMissions + stats.completedIdeaMissions) / (stats.totalMissions + stats.totalIdeaMissions)) * 100)}%
               </div>
               <p className="text-xs text-gray-600">
                 Mission completion
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active</CardTitle>
-              <Clock className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">2</div>
-              <p className="text-xs text-gray-600">
-                Currently running
               </p>
             </CardContent>
           </Card>

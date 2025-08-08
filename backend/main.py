@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 
 # Import API routers
-from api.v1.endpoints import agents, executions, workflows, documents, chat, optimization, health
+from api.v1.endpoints import agents, executions, workflows, documents, chat, optimization, health, idea_missions
 from core.dependencies import get_service_stats, update_llm_service_config, get_settings
 
 # Create FastAPI app
@@ -44,6 +44,7 @@ app.include_router(workflows.router, prefix="/api/v1", tags=["Workflows"])
 app.include_router(documents.router, prefix="/api/v1", tags=["Documents"])
 app.include_router(chat.router, prefix="/api/v1", tags=["Chat"])
 app.include_router(optimization.router, prefix="/api/v1", tags=["Optimization"])
+app.include_router(idea_missions.router, prefix="/api/v1", tags=["IdeaMissions"]) 
 
 @app.get("/")
 async def root():

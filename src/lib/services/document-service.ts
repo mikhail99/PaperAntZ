@@ -233,7 +233,9 @@ export class DocumentService {
       params.append('missionId', missionId);
     }
 
-    const response = await fetch(`http://localhost:8000/api/v1/document-groups?${params.toString()}`);
+    // Call the Python backend directly (authoritative source)
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const response = await fetch(`${baseUrl}/document-groups?${params.toString()}`);
     
     if (!response.ok) {
       throw new Error('Failed to fetch document groups');

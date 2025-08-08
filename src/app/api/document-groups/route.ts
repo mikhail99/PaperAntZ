@@ -12,31 +12,39 @@ export async function GET(request: NextRequest) {
       where.missionId = missionId;
     }
 
-    const groups = await db.documentGroup.findMany({
-      where,
-      include: {
-        documents: {
-          include: {
-            document: true
+    try {
+      const groups = await db.documentGroup.findMany({
+        where,
+        include: {
+          documents: {
+            include: {
+              document: true
+            }
           }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+        },
+        orderBy: { createdAt: 'desc' }
+      });
 
-    const processedGroups = groups.map(group => ({
-      ...group,
-      tags: group.tags ? JSON.parse(group.tags) : [],
-      documents: group.documents.map(gd => ({
-        ...(gd.document as any),
-        metadata: (gd.document as any).metadata ? JSON.parse((gd.document as any).metadata) : {},
-        embedding: (gd.document as any).embedding ? JSON.parse((gd.document as any).embedding) : null,
-        relevanceScore: (gd.document as any).relevanceScore,
-        processed: (gd.document as any).processed
-      })) as any[]
-    }));
+      const processedGroups = groups.map(group => ({
+        ...group,
+        tags: group.tags ? JSON.parse(group.tags) : [],
+        documents: group.documents.map(gd => ({
+          ...(gd.document as any),
+          metadata: (gd.document as any).metadata ? JSON.parse((gd.document as any).metadata) : {},
+          embedding: (gd.document as any).embedding ? JSON.parse((gd.document as any).embedding) : null,
+          relevanceScore: (gd.document as any).relevanceScore,
+          processed: (gd.document as any).processed
+        })) as any[]
+      }));
 
-    return NextResponse.json(processedGroups);
+      return NextResponse.json(processedGroups, { headers: { 'Cache-Control': 'no-store' } });
+    } catch (dbError) {
+      console.error('Error accessing database for document groups:', dbError);
+      return NextResponse.json(
+        { error: 'Database unavailable', code: 'DB_UNAVAILABLE' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
   } catch (error) {
     console.error('Error fetching document groups:', error);
     return NextResponse.json(

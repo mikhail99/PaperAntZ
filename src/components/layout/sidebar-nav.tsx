@@ -10,11 +10,13 @@ import {
   Zap,
   Library,
   Home,
-  MessageSquare
+  MessageSquare,
+  Lightbulb
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Idea Mission', href: '/idea-mission', icon: Lightbulb },
   { name: 'Research Workspace', href: '/research', icon: FileText },
   { name: 'Document Library', href: '/documents', icon: Library },
   { name: 'Agent Chat', href: '/chat', icon: MessageSquare },

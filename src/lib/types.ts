@@ -13,6 +13,17 @@ export interface ResearchMission {
   completedAt?: Date;
 }
 
+export interface IdeaMission {
+  id: string;
+  title: string;
+  description?: string;
+  status: MissionStatus;
+  documentGroupIds?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt?: Date;
+}
+
 export enum MissionStatus {
   CREATED = 'CREATED',
   PLANNING = 'PLANNING',
@@ -101,6 +112,46 @@ export const mockMissions: ResearchMission[] = [
     status: MissionStatus.PLANNING,
     createdAt: new Date(Date.now() - 10 * 60 * 1000),
     updatedAt: new Date(Date.now() - 10 * 60 * 1000),
+  },
+];
+
+export const mockIdeaMissions: IdeaMission[] = [
+  {
+    id: '1',
+    title: 'Smart Home Energy Management',
+    description: 'AI-powered system to optimize home energy consumption',
+    status: MissionStatus.COMPLETED,
+    documentGroupIds: ['grp_1', 'grp_2'],
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    completedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+  },
+  {
+    id: '2',
+    title: 'Sustainable Food Delivery Platform',
+    description: 'Eco-friendly food delivery with carbon footprint tracking',
+    status: MissionStatus.RESEARCHING,
+    documentGroupIds: ['grp_3'],
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+  },
+  {
+    id: '3',
+    title: 'Mental Health AI Companion',
+    description: 'AI chatbot for mental health support and wellness tracking',
+    status: MissionStatus.PLANNING,
+    documentGroupIds: [],
+    createdAt: new Date(Date.now() - 30 * 60 * 1000),
+    updatedAt: new Date(Date.now() - 30 * 60 * 1000),
+  },
+  {
+    id: '4',
+    title: 'Urban Vertical Farming Network',
+    description: 'Distributed vertical farming system for urban areas',
+    status: MissionStatus.CREATED,
+    documentGroupIds: [],
+    createdAt: new Date(Date.now() - 15 * 60 * 1000),
+    updatedAt: new Date(Date.now() - 15 * 60 * 1000),
   },
 ];
 
