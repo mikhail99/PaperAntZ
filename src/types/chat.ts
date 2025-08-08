@@ -87,6 +87,7 @@ export interface BaseChatProps {
   onKeyDown?: (e: React.KeyboardEvent) => void
   inputRef?: React.RefObject<HTMLInputElement>
   value?: string
+  onMessageAction?: (message: ChatMessage, action: 'like' | 'dislike' | 'save') => void
 }
 
 export interface AgentChatProps extends Omit<BaseChatProps, 'onSendMessage'> {

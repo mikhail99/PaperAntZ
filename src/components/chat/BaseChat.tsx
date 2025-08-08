@@ -16,6 +16,9 @@ import {
   ClockIcon,
   PaperclipIcon,
   SendIcon,
+  ThumbsUp,
+  ThumbsDown,
+  Save as SaveIcon,
   TargetIcon,
   BrainIcon,
   FileEditIcon,
@@ -53,6 +56,7 @@ export function BaseChat({
   onKeyDown,
   inputRef,
   value,
+  onMessageAction,
 }: BaseChatProps) {
   const [inputValue, setInputValue] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -150,6 +154,31 @@ export function BaseChat({
             )}
             
             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            {isAgent && (
+              <div className="mt-2 flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onMessageAction?.(message, 'like')}
+                >
+                  <ThumbsUp className="h-3 w-3 mr-1" /> Like
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onMessageAction?.(message, 'dislike')}
+                >
+                  <ThumbsDown className="h-3 w-3 mr-1" /> Dislike
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onMessageAction?.(message, 'save')}
+                >
+                  <SaveIcon className="h-3 w-3 mr-1" /> Save
+                </Button>
+              </div>
+            )}
             {message.attachments && message.attachments.length > 0 && (
               <div className="mt-2 space-y-1">
                 {message.attachments.map((attachment) => (

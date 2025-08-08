@@ -15,14 +15,10 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Idea Mission', href: '/idea-mission', icon: Lightbulb },
-  { name: 'Research Workspace', href: '/research', icon: FileText },
-  { name: 'Document Library', href: '/documents', icon: Library },
-  { name: 'Agent Chat', href: '/chat', icon: MessageSquare },
-  { name: 'Prompt Optimization', href: '/optimization', icon: Zap },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Research', href: '/research', icon: FileText },
+  { name: 'Documents', href: '/documents', icon: Library },
+  { name: 'Dashboard', href: '/dashboard', icon: Home },
 ];
 
 export function SidebarNav() {

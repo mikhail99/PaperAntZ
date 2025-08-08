@@ -241,7 +241,7 @@ export default function IdeaMissionPage() {
                       <Label className="text-right">Document Group</Label>
                       <div className="col-span-3">
                         <Select 
-                          value={newMission.documentGroupIds[0] || ''}
+                          value={newMission.documentGroupIds[0] ?? undefined}
                           onValueChange={handleSelectGroup}
                           disabled={!!groupsError}
                         >

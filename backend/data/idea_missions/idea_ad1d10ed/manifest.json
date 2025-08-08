@@ -1,0 +1,44 @@
+[
+  {
+    "id": "file_2f20d527",
+    "name": "planning_test5.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:39:21.680054",
+    "path": "artifacts/2025-08-08_15-39-21_planning_test5.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
+    "id": "file_cd7e6fc5",
+    "name": "planning_test2.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:37:45.747508",
+    "path": "artifacts/2025-08-08_15-37-45_planning_test2.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
+    "id": "file_c7c0a3e2",
+    "name": "planning_test2.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:37:31.036417",
+    "path": "artifacts/2025-08-08_15-37-31_planning_test2.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  }
+]

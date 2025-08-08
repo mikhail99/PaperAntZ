@@ -5,12 +5,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { 
-  BarChart3, 
-  FileText, 
-  Zap,
+  FileText,
   Library,
   Home,
-  MessageSquare
+  Lightbulb,
 } from 'lucide-react';
 
 interface MainLayoutProps {
@@ -18,11 +16,10 @@ interface MainLayoutProps {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Idea Mission', href: '/idea-mission', icon: Lightbulb },
   { name: 'Research', href: '/research', icon: FileText },
   { name: 'Documents', href: '/documents', icon: Library },
-  { name: 'Agent Chat', href: '/chat', icon: MessageSquare },
-  { name: 'Optimization', href: '/optimization', icon: Zap },
+  { name: 'Dashboard', href: '/dashboard', icon: Home },
 ];
 
 export function MainLayout({ children }: MainLayoutProps) {

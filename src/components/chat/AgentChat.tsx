@@ -155,6 +155,7 @@ export function AgentChat({
   isLoading = false,
   placeholder = "Select an agent and type instructions... Use @ to reference files",
   className,
+  onMessageAction,
 }: AgentChatProps) {
   const [inputValue, setInputValue] = useState('')
   const [fileSearchTerm, setFileSearchTerm] = useState('')
@@ -463,6 +464,7 @@ export function AgentChat({
             onKeyDown={handleKeyDown}
             inputRef={inputRef}
             value={inputValue}
+            onMessageAction={onMessageAction}
           />
 
           {/* Enhanced File Suggestions Dropdown */}

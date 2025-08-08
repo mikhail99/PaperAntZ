@@ -1,0 +1,44 @@
+[
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-08T15:37:54.356465"
+  },
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-08T15:37:55.790212"
+  },
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-08T15:37:56.465114"
+  },
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-08T15:37:57.017745"
+  },
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-08T15:39:05.165305"
+  },
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-08T15:39:08.129867"
+  }
+]

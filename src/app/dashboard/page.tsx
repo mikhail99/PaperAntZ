@@ -14,7 +14,8 @@ import {
   TrendingUp,
   Plus,
   Play,
-  MessageSquare
+  MessageSquare,
+  Lightbulb
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { ResearchMission, OptimizationSession, IdeaMission, mockMissions, mockOptimizations, mockIdeaMissions } from '@/lib/types';

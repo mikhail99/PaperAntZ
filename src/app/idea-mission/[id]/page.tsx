@@ -23,7 +23,14 @@ import {
   BarChart3
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/main-layout';
-import { IdeaMission, mockIdeaMissions, MissionStatus } from '@/lib/types';
+import { AgentChat, ChatProvider, useFileManager } from '@/components/chat';
+import { AgentType, ChatMessage, ChatFile } from '@/types/chat';
+import { IdeaMission, MissionStatus } from '@/lib/types';
+import { ideaService } from '@/lib/services/idea-service';
+import { ideaAgentService } from '@/lib/services/idea-agent-service';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 export default function IdeaMissionDetail() {
   const params = useParams();
@@ -32,12 +39,52 @@ export default function IdeaMissionDetail() {
   const [mission, setMission] = useState<IdeaMission | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Chat state (reuse research chat UX)
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
+  const [availableFiles, setAvailableFiles] = useState<ChatFile[]>([]);
+  const [generatedFiles, setGeneratedFiles] = useState<ChatFile[]>([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const { files, addFile, addGeneratedFile } = useFileManager();
+  const { toast } = useToast();
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveTarget, setSaveTarget] = useState<ChatMessage | null>(null);
+  const [saveName, setSaveName] = useState('');
+
   useEffect(() => {
-    // Find the mission from mock data
-    const foundMission = mockIdeaMissions.find(m => m.id === missionId);
-    if (foundMission) {
-      setMission(foundMission);
-    }
+    (async () => {
+      try {
+        const data = await ideaService.get(missionId);
+        const mapped: IdeaMission = {
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          status: (data.status as MissionStatus) || MissionStatus.CREATED,
+          documentGroupIds: data.documentGroupIds || [],
+          createdAt: new Date(data.createdAt),
+          updatedAt: new Date(data.updatedAt),
+          completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
+        };
+        setMission(mapped);
+
+        // Load chat history
+        const chat = await ideaAgentService.getChat(missionId);
+        const mappedChat: ChatMessage[] = (chat || []).map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.timestamp || Date.now()),
+          agentId: m.agentId,
+          agentName: m.agentName,
+          agentIcon: m.agentIcon,
+          metadata: m.metadata,
+        }));
+        setMessages(mappedChat);
+      } catch (e) {
+        console.error('Failed to load idea mission', e);
+        setMission(null);
+      }
+    })();
   }, [missionId]);
 
   const getStatusIcon = (status: string) => {
@@ -52,6 +99,65 @@ export default function IdeaMissionDetail() {
       default:
         return <AlertCircle className="h-4 w-4 text-gray-600" />;
     }
+  };
+
+  // Agents (reuse names/icons from research)
+  const agents: AgentType[] = [
+    { id: 'planning', name: 'Planning Agent', description: 'Shapes idea development plan', color: 'blue', icon: 'target' },
+    { id: 'research', name: 'Research Agent', description: 'Analyzes market and feasibility', color: 'green', icon: 'brain' },
+    { id: 'writing', name: 'Writing Agent', description: 'Drafts the idea report', color: 'purple', icon: 'file-edit' },
+    { id: 'review', name: 'Review Agent', description: 'Reviews and refines outputs', color: 'orange', icon: 'users' },
+  ];
+
+  const handleAgentSelect = (agent: AgentType) => setSelectedAgent(agent);
+
+  const handleAgentExecute = async (agent: AgentType, message: string, filesInput: File[]) => {
+    setIsChatLoading(true);
+    const userMessage: ChatMessage = { id: Date.now().toString(), role: 'user', content: message, timestamp: new Date() };
+    setMessages(prev => [...prev, userMessage]);
+
+    try {
+      if (agent.id === 'planning') {
+        const exec = await ideaAgentService.executePlanning(missionId, {
+          userId: 'demo-user',
+          message,
+          history: messages.map(m => ({ id: m.id, role: m.role, content: m.content })),
+          documentGroupIds: mission?.documentGroupIds || [],
+        });
+
+        const agentMessage: ChatMessage = {
+          id: exec.messageId,
+          role: 'assistant',
+          content: exec.answer,
+          timestamp: new Date(),
+          agentId: agent.id,
+          agentName: agent.name,
+          agentIcon: agent.icon,
+        };
+        setMessages(prev => [...prev, agentMessage]);
+      } else {
+        // Fallback: echo
+        const agentMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `${agent.name} processed: ${message}`,
+          timestamp: new Date(),
+          agentId: agent.id,
+          agentName: agent.name,
+          agentIcon: agent.icon,
+        };
+        setMessages(prev => [...prev, agentMessage]);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  const handleFileSelect = (newFiles: File[]) => {
+    const chatFiles = newFiles.map(f => addFile(f, 'upload'));
+    setAvailableFiles(prev => [...prev, ...chatFiles]);
   };
 
   const getStatusColor = (status: string) => {
@@ -107,6 +213,7 @@ export default function IdeaMissionDetail() {
   }
 
   return (
+    <ChatProvider>
     <MainLayout>
       <div className="p-8">
         <div className="flex items-center gap-4 mb-8">
@@ -151,8 +258,8 @@ export default function IdeaMissionDetail() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="development">Development</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="agent-chat">Agent Chat</TabsTrigger>
+            <TabsTrigger value="report">Idea Report</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -268,73 +375,72 @@ export default function IdeaMissionDetail() {
             </div>
           </TabsContent>
 
-          <TabsContent value="development" className="space-y-6">
+          <TabsContent value="agent-chat" className="space-y-6">
+            <Card className="h-[calc(100vh-12rem)]">
+              <CardHeader className="pb-4">
+                <CardTitle>Agent Chat</CardTitle>
+                <CardDescription>Work with agents to develop this idea</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 h-[calc(100%-8rem)]">
+                <AgentChat
+                  messages={messages}
+                  agents={agents}
+                  selectedAgent={selectedAgent}
+                  onAgentSelect={handleAgentSelect}
+                  onAgentExecute={handleAgentExecute}
+                  availableFiles={[...files, ...availableFiles]}
+                  generatedFiles={generatedFiles}
+                  isLoading={isChatLoading}
+                  onFileSelect={handleFileSelect}
+                  onMessageAction={async (message, action) => {
+                    try {
+                      if (message.role !== 'assistant') return;
+                      if (!mission) return;
+                      if (action === 'like' || action === 'dislike') {
+                        await ideaAgentService.submitFeedback(missionId, message.id, { userId: 'demo-user', rating: action === 'like' ? 'up' : 'down' });
+                        toast({ title: 'Feedback sent', description: action === 'like' ? 'Marked as helpful' : 'Marked as not helpful' });
+                      }
+                      if (action === 'save') {
+                        setSaveTarget(message);
+                        const defaultName = mission.title.replace(/\s+/g, '-').toLowerCase();
+                        setSaveName(defaultName);
+                        setSaveOpen(true);
+                      }
+                    } catch (e) {
+                      console.error('action failed', e);
+                      toast({ title: 'Action failed', description: String(e) });
+                    }
+                  }}
+                  placeholder="Select an agent and type instructions... Use @ to reference files"
+                  className="h-full border-0 rounded-none"
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="report" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Development Timeline</CardTitle>
-                <CardDescription>
-                  Track the development stages of your idea
-                </CardDescription>
+                <CardTitle>Idea Report</CardTitle>
+                <CardDescription>Drafts and outputs generated for this idea</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium">Conceptualization</h4>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Initial idea formation and concept development
-                      </p>
-                      <span className="text-xs text-gray-500">
-                        {mission.createdAt.toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                      mission.status === 'RESEARCHING' || mission.status === 'COMPLETED' 
-                        ? 'bg-blue-100' 
-                        : 'bg-gray-100'
-                    }`}>
-                      {mission.status === 'RESEARCHING' || mission.status === 'COMPLETED' ? (
-                        <Brain className="h-4 w-4 text-blue-600" />
-                      ) : (
-                        <AlertCircle className="h-4 w-4 text-gray-400" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium">Research & Analysis</h4>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Market research, feasibility analysis, and validation
-                      </p>
-                      {mission.status === 'RESEARCHING' && (
-                        <span className="text-xs text-blue-600">In Progress</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                      mission.status === 'COMPLETED' 
-                        ? 'bg-green-100' 
-                        : 'bg-gray-100'
-                    }`}>
-                      {mission.status === 'COMPLETED' ? (
-                        <FileText className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <AlertCircle className="h-4 w-4 text-gray-400" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium">Prototype Development</h4>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Creating initial prototypes and testing
-                      </p>
-                    </div>
-                  </div>
+                <div className="space-y-3 text-sm text-gray-700">
+                  {generatedFiles.length === 0 ? (
+                    <div className="text-gray-500">No report files yet. Use Agent Chat to generate content.</div>
+                  ) : (
+                    generatedFiles.map((f) => (
+                      <div key={f.id} className="flex items-center justify-between p-3 border rounded-md">
+                        <div className="truncate">{f.name}</div>
+                        <Button size="sm" variant="outline" onClick={() => {
+                          const blob = new Blob([f.content], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url; a.download = f.name; a.click(); URL.revokeObjectURL(url);
+                        }}>Download</Button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -394,7 +500,48 @@ export default function IdeaMissionDetail() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Save dialog */}
+        <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Save response as file</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <label className="text-sm">Filename (without extension)</label>
+              <Input value={saveName} onChange={(e) => setSaveName(e.target.value)} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSaveOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                if (!saveTarget || !mission) return;
+                try {
+                  const res = await ideaAgentService.saveMessage(missionId, saveTarget.id, {
+                    userId: 'demo-user',
+                    content: saveTarget.content,
+                    format: 'markdown',
+                    filenameHint: saveName || mission.title.replace(/\s+/g, '-').toLowerCase(),
+                    metadata: { agentId: saveTarget.agentId, agentName: saveTarget.agentName },
+                  });
+                  const artifact = res.artifact;
+                  const fileName = artifact?.name || `${saveName || 'idea-plan'}.md`;
+                  const added = addGeneratedFile(fileName, saveTarget.content, saveTarget.agentName || 'Agent');
+                  setGeneratedFiles(prev => [added, ...prev]);
+                  setAvailableFiles(prev => [added, ...prev]);
+                  toast({ title: 'Saved', description: `${fileName} added to Available Files` });
+                } catch (e) {
+                  console.error(e);
+                  toast({ title: 'Save failed', description: String(e) });
+                } finally {
+                  setSaveOpen(false);
+                  setSaveTarget(null);
+                }
+              }}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
+    </ChatProvider>
   );
 }

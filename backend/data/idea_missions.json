@@ -1,5 +1,18 @@
 [
   {
+    "id": "idea_ad1d10ed",
+    "userId": "demo-user",
+    "title": "test2",
+    "description": "test2",
+    "status": "CREATED",
+    "documentGroupIds": [
+      "LLM_Reasoning_Agents"
+    ],
+    "createdAt": "2025-08-08T13:55:35.525595",
+    "updatedAt": "2025-08-08T13:55:35.525595",
+    "completedAt": null
+  },
+  {
     "id": "idea_3fffb89b",
     "userId": "demo-user",
     "title": "test",
