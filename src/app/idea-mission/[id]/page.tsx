@@ -31,6 +31,7 @@ import { ideaAgentService } from '@/lib/services/idea-agent-service';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function IdeaMissionDetail() {
   const params = useParams();
@@ -50,6 +51,9 @@ export default function IdeaMissionDetail() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveTarget, setSaveTarget] = useState<ChatMessage | null>(null);
   const [saveName, setSaveName] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState('note');
+  const [addContent, setAddContent] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -388,7 +392,7 @@ export default function IdeaMissionDetail() {
                   selectedAgent={selectedAgent}
                   onAgentSelect={handleAgentSelect}
                   onAgentExecute={handleAgentExecute}
-                  availableFiles={[...files, ...availableFiles]}
+                  availableFiles={[...files, ...generatedFiles, ...availableFiles]}
                   generatedFiles={generatedFiles}
                   isLoading={isChatLoading}
                   onFileSelect={handleFileSelect}
@@ -414,6 +418,9 @@ export default function IdeaMissionDetail() {
                   placeholder="Select an agent and type instructions... Use @ to reference files"
                   className="h-full border-0 rounded-none"
                 />
+                <div className="p-3 border-t flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>Add Text File</Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -537,6 +544,41 @@ export default function IdeaMissionDetail() {
                   setSaveTarget(null);
                 }
               }}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add external text file */}
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Add text file to Available Files</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <label className="text-sm">Filename (without extension)</label>
+              <Input value={addName} onChange={(e) => setAddName(e.target.value)} />
+              <label className="text-sm">Content</label>
+              <Textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={10} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                try {
+                  const res = await ideaAgentService.addTextArtifact(missionId, { userId: 'demo-user', name: addName, content: addContent, format: 'markdown' });
+                  const artifact = res.artifact;
+                  const fileName = artifact?.name || `${addName}.md`;
+                  const added = addGeneratedFile(fileName, addContent, 'External');
+                  setGeneratedFiles(prev => [added, ...prev]);
+                  setAvailableFiles(prev => [added, ...prev]);
+                  toast({ title: 'Added', description: `${fileName} added to Available Files` });
+                } catch (e) {
+                  toast({ title: 'Add failed', description: String(e) });
+                } finally {
+                  setAddOpen(false);
+                  setAddName('note');
+                  setAddContent('');
+                }
+              }}>Add</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

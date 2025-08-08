@@ -460,6 +460,53 @@ async def download_artifact(mission_id: str, file_id: str):
     raise HTTPException(status_code=404, detail='Artifact not found')
 
 
+# --- Add external text file ---
+class AddTextArtifactRequest(BaseModel):
+    userId: str
+    name: str  # filename without extension ok
+    content: str
+    format: Optional[str] = "markdown"  # markdown|text|json
+    metadata: Optional[Dict[str, Any]] = None
+
+@router.post("/idea-missions/{mission_id}/artifacts/text")
+async def add_text_artifact(mission_id: str, req: AddTextArtifactRequest):
+    try:
+        mission_dir = _mission_dir(mission_id)
+        manifest_path = _manifest_path(mission_id)
+        manifest = _read_json(manifest_path, [])
+
+        ext = 'md' if req.format == 'markdown' else ('json' if req.format == 'json' else 'txt')
+        base = req.name.rstrip().replace('/', '-') or 'note'
+        timestamp = get_timestamp().replace(':', '-').replace('T', '_').split('.')[0]
+        name = f"{base}.{ext}"
+        filename = f"{timestamp}_{name}"
+        file_path = mission_dir / 'artifacts' / filename
+
+        tmp = file_path.with_suffix(file_path.suffix + '.tmp')
+        content_str = req.content if isinstance(req.content, str) else json.dumps(req.content, ensure_ascii=False, indent=2)
+        tmp.write_text(content_str, encoding='utf-8')
+        tmp.replace(file_path)
+
+        artifact_id = generate_id('file')
+        record = {
+            "id": artifact_id,
+            "name": name,
+            "type": req.format,
+            "size": len(content_str.encode('utf-8')),
+            "createdAt": get_timestamp(),
+            "path": f"artifacts/{filename}",
+            "agent": "external",
+            "messageId": None,
+            "metadata": req.metadata or {},
+        }
+        manifest.insert(0, record)
+        _write_json(manifest_path, manifest)
+
+        return create_success_response({ "artifact": { **record, "downloadUrl": f"/api/v1/idea-missions/{mission_id}/files/{artifact_id}" } }, "Artifact added")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add artifact: {str(e)}")
+
+
 # --- Chat history ---
 @router.get("/idea-missions/{mission_id}/chat")
 async def get_chat_history(mission_id: str):

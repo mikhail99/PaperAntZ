@@ -1,5 +1,117 @@
 [
   {
+    "id": "file_ed4fb0b3",
+    "name": "planning_test2.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:59:34.885016",
+    "path": "artifacts/2025-08-08_15-59-34_planning_test2.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
+    "id": "file_71c7437b",
+    "name": "planning_test2.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:59:04.001544",
+    "path": "artifacts/2025-08-08_15-59-04_planning_test2.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
+    "id": "file_be7fa3a5",
+    "name": "planning_testzz.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:56:01.297511",
+    "path": "artifacts/2025-08-08_15-56-01_planning_testzz.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
+    "id": "file_52f65a04",
+    "name": "planning_testz.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:55:52.921174",
+    "path": "artifacts/2025-08-08_15-55-52_planning_testz.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
+    "id": "file_193f51c6",
+    "name": "planning_test6.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:54:30.163339",
+    "path": "artifacts/2025-08-08_15-54-30_planning_test6.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
+    "id": "file_61a3c5a6",
+    "name": "planning_test5.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:51:28.949528",
+    "path": "artifacts/2025-08-08_15-51-28_planning_test5.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
+    "id": "file_f242eb96",
+    "name": "planning_test5.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:49:39.576365",
+    "path": "artifacts/2025-08-08_15-49-39_planning_test5.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
+    "id": "file_6061a546",
+    "name": "planning_test5.md",
+    "type": "markdown",
+    "size": 1509,
+    "createdAt": "2025-08-08T15:46:01.955726",
+    "path": "artifacts/2025-08-08_15-46-01_planning_test5.md",
+    "agent": "planning",
+    "messageId": "msg_d986a221",
+    "metadata": {
+      "agentId": "planning",
+      "agentName": "Planning Agent"
+    }
+  },
+  {
     "id": "file_2f20d527",
     "name": "planning_test5.md",
     "type": "markdown",

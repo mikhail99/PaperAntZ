@@ -29,6 +29,7 @@ export interface ChatFile {
   uploadedAt: Date
   source: 'upload' | 'generated'
   generatedBy?: string // Agent name if generated
+  metadata?: Record<string, any>
 }
 
 export interface ChatSession {
@@ -96,6 +97,10 @@ export interface AgentChatProps extends Omit<BaseChatProps, 'onSendMessage'> {
   onAgentSelect: (agent: AgentType) => void
   onAgentExecute: (agent: AgentType, message: string, files: File[]) => void
   generatedFiles: ChatFile[]
+  onFileRename?: (fileId: string, newName: string) => void
+  onFileDelete?: (fileId: string) => void
+  onFileStar?: (fileId: string, starred: boolean) => void
+  starredIds?: string[]
 }
 
 export interface DocumentChatProps extends Omit<BaseChatProps, 'onSendMessage'> {

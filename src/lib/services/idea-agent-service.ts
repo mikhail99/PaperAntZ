@@ -73,6 +73,15 @@ export const ideaAgentService = {
     const data = await res.json();
     if (!res.ok || data.success === false) throw new Error(data.error || 'Append chat failed');
     return data.data;
+  },
+
+  async addTextArtifact(missionId: string, payload: { userId: string; name: string; content: string; format?: string; metadata?: any }) {
+    const res = await fetch(`${API_BASE}/idea-missions/${missionId}/artifacts/text`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || data.success === false) throw new Error(data.error || 'Add artifact failed');
+    return data.data;
   }
 }
 
