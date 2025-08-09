@@ -4,6 +4,9 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { BaseChat } from './BaseChat'
 import { AgentChatProps, AgentType, ChatFile, FileSuggestion, FileContext } from '@/types/chat'
 import { Button } from '@/components/ui/button'
+import { Drawer, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
+import { Label } from '@/components/ui/label'
+import { agentService } from '@/lib/services/agent-service'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -199,6 +202,10 @@ export function AgentChat({
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+  const [showParams, setShowParams] = useState(false)
+  const [draftAgent, setDraftAgent] = useState<AgentType | null>(null)
+  // Mission presets are used only to prefill prompt values for fixed agents
+  const [missionPresets, setMissionPresets] = useState<any[]>([])
 
   // Enhanced file filtering with better search
   const filteredFiles = useMemo(() => {
@@ -333,6 +340,23 @@ export function AgentChat({
     }
   }, [])
 
+  // Load mission presets
+  const loadPresets = useCallback(async () => {
+    try {
+      const parts = window.location.pathname.split('/')
+      const idx = parts.indexOf('idea-mission')
+      const missionId = idx >= 0 ? parts[idx + 1] : ''
+      if (missionId) {
+        const list = await agentService.listMissionPresets(missionId)
+        setMissionPresets(list)
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    loadPresets()
+  }, [loadPresets])
+
   // Handle agent execution
   const handleExecuteAgent = useCallback(() => {
     if (!selectedAgent || !inputValue.trim()) return
@@ -362,8 +386,14 @@ export function AgentChat({
   // Handle message send (delegates to agent execution)
   const handleSendMessage = useCallback((message: string, attachments?: File[]) => {
     if (!selectedAgent) {
-      // If no agent selected, just send as regular message
-      // This could be handled by parent component
+      // Attempt to read last selected agent from marketplace
+      try {
+        const raw = localStorage.getItem('agent_selected')
+        if (raw) {
+          const a = JSON.parse(raw)
+          onAgentSelect(a)
+        }
+      } catch {}
       return
     }
     
@@ -387,38 +417,41 @@ export function AgentChat({
       <Card className="w-80 flex-shrink-0">
         <CardContent className="p-4 h-full flex flex-col">
           <h3 className="font-semibold mb-4">Agents</h3>
+          <Button variant="outline" size="sm" className="mb-3" onClick={() => {
+            window.location.assign('/agents')
+          }}>Browse marketplace</Button>
           
+          {/* Fixed agents with original card look and inline Edit */}
           <ScrollArea className="flex-1">
             <div className="space-y-2">
-              {agents.map((agent) => {
-                const isExecuted = executedAgents.has(agent.id)
-                const isSelected = selectedAgent?.id === agent.id
-                
+              {AGENT_TYPES.map((a) => {
+                const isSelected = selectedAgent?.id === a.id
                 return (
-                  <Button
-                    key={agent.id}
-                    variant={isSelected ? "default" : "outline"}
-                    className={cn(
-                      'w-full justify-start h-auto p-3',
-                      isSelected && 'border-2'
-                    )}
-                    onClick={() => onAgentSelect(agent)}
-                  >
+                  <div key={a.id} className={cn('w-full h-auto p-3 border rounded-lg', isSelected && 'border-2')}> 
                     <div className="flex items-center gap-3 w-full">
-                      <div className="text-2xl">{getAgentIcon(agent.icon)}</div>
-                      <div className="flex-1 text-left">
-                        <div className="font-medium">{agent.name}</div>
-                        <div className="text-xs opacity-70">{agent.description}</div>
+                      <div className="text-2xl">{getAgentIcon(a.icon)}</div>
+                      <button className="flex-1 text-left" onClick={() => onAgentSelect(a)}>
+                        <div className="font-medium">{a.name}</div>
+                        <div className="text-xs opacity-70">{a.description}</div>
+                      </button>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" title="Edit" onClick={() => {
+                          // Prefill prompt from mission preset if present
+                          const preset = missionPresets.find((p:any)=> (p.agentType === a.id) || (p.id === `preset_${a.id}`))
+                          setDraftAgent({ ...a, systemPrompt: preset?.systemPrompt || '' })
+                          setShowParams(true)
+                        }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       </div>
-                      {isExecuted && (
-                        <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                      )}
                     </div>
-                  </Button>
+                  </div>
                 )
               })}
             </div>
           </ScrollArea>
+
+          {/* Mission presets section removed; shown above with original styling */}
 
           {/* Selected Agent Info */}
           {selectedAgent && (
@@ -437,6 +470,7 @@ export function AgentChat({
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
+        {/* Team Mode removed for MVP */}
         {/* File Context Panel */}
         <Card className="mb-4">
           <CardContent className="p-4">
@@ -623,6 +657,37 @@ export function AgentChat({
           )}
         </div>
       </div>
+          {/* Parameters Drawer (prompt-only for MVP) */}
+      <Drawer open={showParams} onOpenChange={setShowParams}>
+        <DrawerContent className="sm:max-w-md">
+          <DrawerHeader>
+                <DrawerTitle>Edit system prompt</DrawerTitle>
+          </DrawerHeader>
+          <div className="p-4 space-y-3">
+            <div>
+              <Label className="text-xs">System Prompt</Label>
+              <textarea className="w-full border px-2 py-1 rounded text-sm h-28" value={draftAgent?.systemPrompt || ''} onChange={(e)=>setDraftAgent(prev=>prev?{...prev, systemPrompt:e.target.value}:prev)} />
+            </div>
+          </div>
+          <DrawerFooter>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={()=>setShowParams(false)}>Cancel</Button>
+              <Button onClick={async ()=>{ if (draftAgent) {
+                try {
+                      const parts = window.location.pathname.split('/')
+                      const mIdx = parts.indexOf('idea-mission')
+                      const missionId = mIdx >= 0 ? parts[mIdx + 1] : ''
+                      if (missionId) {
+                        const body = { id: `preset_${draftAgent.id}`, name: draftAgent.name, agentType: draftAgent.id, icon: draftAgent.icon, temperature: 0.7, systemPrompt: draftAgent.systemPrompt ?? '', styleLevel: 50 }
+                        await agentService.saveMissionPreset(missionId, body)
+                      }
+                } catch {}
+                    onAgentSelect(draftAgent); setShowParams(false)
+              } }}>Save</Button>
+            </div>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </div>
   )
 }

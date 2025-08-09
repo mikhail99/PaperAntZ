@@ -28,6 +28,7 @@ import { AgentType, ChatMessage, ChatFile, FileContext } from '@/types/chat';
 import { IdeaMission, MissionStatus } from '@/lib/types';
 import { ideaService } from '@/lib/services/idea-service';
 import { ideaAgentService } from '@/lib/services/idea-agent-service';
+import { agentService } from '@/lib/services/agent-service';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -121,6 +122,12 @@ export default function IdeaMissionDetail() {
           contexts.forEach((c: any) => { ctxMap[c.id] = { selected: !!c.selected, prompt: c.prompt || '' } })
           // Attach to window for AgentChat to optionally read (simple approach without lifting state fully)
           ;(window as any).__seedFileContext = ctxMap
+        } catch {}
+
+        // Load mission-scoped agent presets (for future advanced UI)
+        try {
+          const presets = await agentService.listMissionPresets(missionId)
+          ;(window as any).__missionAgentPresets = presets
         } catch {}
       } catch (e) {
         console.error('Failed to load idea mission', e);

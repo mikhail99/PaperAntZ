@@ -12,7 +12,8 @@ import {
   ArrowRight,
   Sparkles,
   MessageSquare,
-  Lightbulb
+  Lightbulb,
+  Bot
 } from 'lucide-react';
 
 export default function Home() {
@@ -42,6 +43,12 @@ export default function Home() {
       title: 'Dashboard',
       description: 'Track performance and gain insights from your research',
       action: () => router.push('/dashboard')
+    }
+    ,{
+      icon: Bot,
+      title: 'Agents Marketplace',
+      description: 'Discover, customize, and optimize agents for your workflows',
+      action: () => router.push('/agents')
     }
   ];
 

@@ -9,6 +9,7 @@ import {
   Library,
   Home,
   Lightbulb,
+  Bot
 } from 'lucide-react';
 
 interface MainLayoutProps {
@@ -20,6 +21,7 @@ const navigation = [
   { name: 'Research', href: '/research', icon: FileText },
   { name: 'Documents', href: '/documents', icon: Library },
   { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Agents', href: '/agents', icon: Bot },
 ];
 
 export function MainLayout({ children }: MainLayoutProps) {

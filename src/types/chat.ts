@@ -62,6 +62,10 @@ export interface AgentType {
   description: string
   color: string
   icon: string
+  baseType?: string // if this is a mission-scoped preset, reference the base agent id
+  temperature?: number
+  systemPrompt?: string
+  styleLevel?: number // 0-100, brief->verbose
 }
 
 export interface AgentExecution {

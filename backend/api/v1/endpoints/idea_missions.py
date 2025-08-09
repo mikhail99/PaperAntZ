@@ -24,6 +24,16 @@ STORE_FILE = DATA_DIR / "idea_missions.json"
 # Concurrency control
 store_lock = asyncio.Lock()
 
+# Canonical operation names (MCP-ready)
+OP_PLANNING_EXECUTE = "idea.planning.execute"
+OP_ARTIFACT_LIST = "idea.artifacts.list"
+OP_ARTIFACT_SAVE = "idea.artifacts.save"
+OP_ARTIFACT_RENAME = "idea.artifacts.rename"
+OP_ARTIFACT_UPDATE_CONTENT = "idea.artifacts.update_content"
+OP_ARTIFACT_DELETE = "idea.artifacts.delete"
+OP_CHAT_APPEND = "idea.chat.append"
+OP_FILE_CONTEXT_PUT = "idea.file_context.put"
+
 
 class IdeaMissionModel(BaseModel):
     id: str
@@ -89,6 +99,12 @@ def _chat_path(mission_id: str) -> Path:
 def _file_context_path(mission_id: str) -> Path:
     return _mission_dir(mission_id) / "file_context.json"
 
+def _presets_path(mission_id: str) -> Path:
+    return _mission_dir(mission_id) / "agents_presets.json"
+
+def _activity_path(mission_id: str) -> Path:
+    return _mission_dir(mission_id) / "activity.json"
+
 def _read_json(path: Path, default):
     if not path.exists():
         return default
@@ -103,7 +119,27 @@ def _write_json(path: Path, data):
     tmp.replace(path)
 
 
-@router.get("/idea-missions")
+def _log_activity(mission_id: str, operation: str, args_summary: Dict[str, Any], user_id: Optional[str] = None, result: Optional[Dict[str, Any]] = None):
+    """Append a lightweight activity record for auditing/analytics.
+    Non-failing best-effort; never raises in request flow.
+    """
+    try:
+        path = _activity_path(mission_id)
+        data = _read_json(path, [])
+        data.append({
+            "timestamp": get_timestamp(),
+            "operation": operation,
+            "userId": user_id,
+            "args": args_summary,
+            "result": result or {},
+        })
+        _write_json(path, data)
+    except Exception:
+        # Do not interfere with the main operation
+        pass
+
+
+@router.get("/idea-missions", tags=["Missions"], summary="List idea missions")
 async def list_idea_missions(userId: Optional[str] = Query(None)):
     """List idea missions, optionally filtered by userId"""
     async with store_lock:
@@ -113,7 +149,7 @@ async def list_idea_missions(userId: Optional[str] = Query(None)):
     return create_success_response(missions, "Idea missions retrieved")
 
 
-@router.get("/idea-missions/{mission_id}")
+@router.get("/idea-missions/{mission_id}", tags=["Missions"], summary="Get a mission by id")
 async def get_idea_mission(mission_id: str):
     async with store_lock:
         missions = _read_store()
@@ -123,7 +159,7 @@ async def get_idea_mission(mission_id: str):
     raise HTTPException(status_code=404, detail="Idea mission not found")
 
 
-@router.post("/idea-missions")
+@router.post("/idea-missions", tags=["Missions"], summary="Create a mission")
 async def create_idea_mission(req: CreateIdeaMissionRequest):
     now = get_timestamp()
     new_mission: Dict[str, Any] = {
@@ -144,7 +180,7 @@ async def create_idea_mission(req: CreateIdeaMissionRequest):
     return create_success_response(new_mission, "Idea mission created")
 
 
-@router.patch("/idea-missions/{mission_id}")
+@router.patch("/idea-missions/{mission_id}", tags=["Missions"], summary="Update a mission")
 async def update_idea_mission(mission_id: str, req: UpdateIdeaMissionRequest):
     async with store_lock:
         missions = _read_store()
@@ -167,7 +203,7 @@ async def update_idea_mission(mission_id: str, req: UpdateIdeaMissionRequest):
     raise HTTPException(status_code=404, detail="Idea mission not found")
 
 
-@router.delete("/idea-missions/{mission_id}")
+@router.delete("/idea-missions/{mission_id}", tags=["Missions"], summary="Delete a mission")
 async def delete_idea_mission(mission_id: str):
     async with store_lock:
         missions = _read_store()
@@ -193,7 +229,7 @@ class ExecutePlanningRequest(BaseModel):
     config: Optional[Dict[str, Any]] = None
     files: Optional[List[Dict[str, Any]]] = None  # [{id,name,prompt,url}]
 
-@router.post("/idea-missions/{mission_id}/agents/planning/execute")
+@router.post("/idea-missions/{mission_id}/agents/planning/execute", tags=["Planning"], summary="Execute Planning agent")
 async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
     """Run a simple DSPy-based planning brainstorm using local Ollama model.
     If DSPy/Ollama is unavailable, gracefully fall back to a heuristic markdown plan."""
@@ -250,16 +286,28 @@ async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
                 def forward(self, instruction: str, context: str):
                     return self.predict(instruction=instruction, context=context)
 
+            # Load mission-scoped planning prompt override if present
+            planning_prompt = None
+            try:
+                presets = _read_json(_presets_path(mission_id), [])
+                for p in presets:
+                    if p.get('agentType') == 'planning' or p.get('id') in ('preset_planning', 'planning'):
+                        planning_prompt = p.get('systemPrompt') or None
+                        break
+            except Exception:
+                planning_prompt = None
+
             # Include file prompts as lightweight context
             file_context = "\n".join([
                 f"FILE: {f.get('name')}\nPROMPT: {f.get('prompt','')}\nURL: {f.get('url','')}"
                 for f in (req.files or [])
             ])
-            instruction = (
+            base_instruction = (
                 "You are a Planning Agent. Brainstorm a structured plan for the user's idea. "
                 "Provide a concise markdown plan with sections: Objectives, Assumptions, Approach, Milestones, Risks, Deliverables. "
                 "If file prompts are provided, reflect them appropriately in the plan."
             )
+            instruction = planning_prompt.strip() if planning_prompt else base_instruction
             module = PlanningBrainstorm()
             out = module(instruction=instruction, context=f"User: {req.message}\n\nHistory:\n{context_text}\n\nFiles:\n{file_context}")
             answer = out.plan if hasattr(out, 'plan') else str(out)
@@ -294,6 +342,9 @@ async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
     })
     _write_json(chat_path, chat)
 
+    # Activity log (non-blocking)
+    _log_activity(mission_id, OP_PLANNING_EXECUTE, {"message": req.message}, user_id=req.userId, result={"assistantMessageId": assistant_message_id})
+
     return create_success_response({
         "executionId": execution_id,
         "messageId": assistant_message_id,
@@ -302,6 +353,8 @@ async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
         "answer": answer,
         "mode": mode,
         "usage": {},
+        "operation": OP_PLANNING_EXECUTE,
+        "chatUri": f"idea://{mission_id}/chat",
     }, "Planning agent completed")
 
 
@@ -337,7 +390,7 @@ class SaveMessageRequest(BaseModel):
     filenameHint: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
-@router.post("/idea-missions/{mission_id}/messages/{message_id}/save")
+@router.post("/idea-missions/{mission_id}/messages/{message_id}/save", tags=["Artifacts"], summary="Save assistant message as artifact")
 async def save_message_as_artifact(mission_id: str, message_id: str, req: SaveMessageRequest):
     try:
         mission_dir = _mission_dir(mission_id)
@@ -377,17 +430,24 @@ async def save_message_as_artifact(mission_id: str, message_id: str, req: SaveMe
         manifest.insert(0, record)
         _write_json(manifest_path, manifest)
 
+        # Activity log
+        _log_activity(mission_id, OP_ARTIFACT_SAVE, {"messageId": message_id, "hint": req.filenameHint}, user_id=req.userId, result={"artifactId": artifact_id})
+
         return create_success_response({
             "artifact": {
                 **record,
                 "downloadUrl": f"/api/v1/idea-missions/{mission_id}/files/{artifact_id}",
+                "uri": f"idea://{mission_id}/artifact/{artifact_id}",
             }
         }, "Artifact saved")
     except Exception as e:
+        # Preserve explicit HTTP errors; wrap only unexpected ones
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=f"Failed to save artifact: {str(e)}")
 
 
-@router.get("/idea-missions/{mission_id}/artifacts")
+@router.get("/idea-missions/{mission_id}/artifacts", tags=["Artifacts"], summary="List artifacts")
 async def list_artifacts(mission_id: str):
     manifest = _read_json(_manifest_path(mission_id), [])
     # Ensure downloadUrl is present for each artifact (older manifests may not have it)
@@ -396,6 +456,8 @@ async def list_artifacts(mission_id: str):
         rec = {**rec}
         if not rec.get("downloadUrl"):
             rec["downloadUrl"] = f"/api/v1/idea-missions/{mission_id}/files/{rec.get('id')}"
+        if not rec.get("uri"):
+            rec["uri"] = f"idea://{mission_id}/artifact/{rec.get('id')}"
         enriched.append(rec)
     return create_success_response(enriched, "Artifacts listed")
 
@@ -405,7 +467,7 @@ class UpdateArtifactRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     content: Optional[str] = None
 
-@router.patch("/idea-missions/{mission_id}/artifacts/{artifact_id}")
+@router.patch("/idea-missions/{mission_id}/artifacts/{artifact_id}", tags=["Artifacts"], summary="Update artifact (rename/content/metadata)")
 async def update_artifact(mission_id: str, artifact_id: str, req: UpdateArtifactRequest):
     manifest_path = _manifest_path(mission_id)
     manifest = _read_json(manifest_path, [])
@@ -433,6 +495,7 @@ async def update_artifact(mission_id: str, artifact_id: str, req: UpdateArtifact
                         old_path.rename(new_path)
                     rec['name'] = new_name
                     rec['path'] = f"artifacts/{new_filename}"
+                    _log_activity(mission_id, OP_ARTIFACT_RENAME, {"artifactId": artifact_id, "newName": new_name})
                 except Exception as e:
                     raise HTTPException(status_code=500, detail=f"Rename failed: {str(e)}")
             # Update content if provided
@@ -444,14 +507,17 @@ async def update_artifact(mission_id: str, artifact_id: str, req: UpdateArtifact
                     tmp.replace(path)
                     rec['size'] = len(req.content.encode('utf-8'))
                     rec['updatedAt'] = get_timestamp()
+                    _log_activity(mission_id, OP_ARTIFACT_UPDATE_CONTENT, {"artifactId": artifact_id, "bytes": rec['size']})
                 except Exception as e:
                     raise HTTPException(status_code=500, detail=f"Content update failed: {str(e)}")
             _write_json(manifest_path, manifest)
-            return create_success_response(rec, "Artifact updated")
+            # Enrich response with URIs
+            response_rec = {**rec, "downloadUrl": f"/api/v1/idea-missions/{mission_id}/files/{artifact_id}", "uri": f"idea://{mission_id}/artifact/{artifact_id}"}
+            return create_success_response(response_rec, "Artifact updated")
     raise HTTPException(status_code=404, detail='Artifact not found')
 
 
-@router.delete("/idea-missions/{mission_id}/artifacts/{artifact_id}")
+@router.delete("/idea-missions/{mission_id}/artifacts/{artifact_id}", tags=["Artifacts"], summary="Delete artifact")
 async def delete_artifact(mission_id: str, artifact_id: str):
     manifest_path = _manifest_path(mission_id)
     manifest = _read_json(manifest_path, [])
@@ -472,10 +538,11 @@ async def delete_artifact(mission_id: str, artifact_id: str):
     if not deleted:
         raise HTTPException(status_code=404, detail='Artifact not found')
     _write_json(manifest_path, new_list)
+    _log_activity(mission_id, OP_ARTIFACT_DELETE, {"artifactId": artifact_id})
     return create_success_response({"id": artifact_id}, "Artifact deleted")
 
 
-@router.get("/idea-missions/{mission_id}/files/{file_id}")
+@router.get("/idea-missions/{mission_id}/files/{file_id}", tags=["Artifacts"], summary="Download artifact file")
 async def download_artifact(mission_id: str, file_id: str):
     from fastapi.responses import FileResponse
     manifest = _read_json(_manifest_path(mission_id), [])
@@ -495,15 +562,61 @@ class FileContextItem(BaseModel):
     prompt: Optional[str] = None
     selected: bool = False
 
-@router.get("/idea-missions/{mission_id}/file-context")
+class AgentPreset(BaseModel):
+    id: str
+    name: str
+    agentType: str
+    icon: Optional[str] = None
+    temperature: Optional[float] = 0.7
+    systemPrompt: Optional[str] = None
+    styleLevel: Optional[int] = 50
+
+@router.get("/idea-missions/{mission_id}/file-context", tags=["FileContext"], summary="Get file selection + prompts")
 async def get_file_context(mission_id: str):
     data = _read_json(_file_context_path(mission_id), [])
     return create_success_response(data, "File context")
 
-@router.put("/idea-missions/{mission_id}/file-context")
+@router.put("/idea-missions/{mission_id}/file-context", tags=["FileContext"], summary="Save file selection + prompts")
 async def put_file_context(mission_id: str, items: List[FileContextItem]):
     _write_json(_file_context_path(mission_id), [i.dict() for i in items])
-    return create_success_response({"count": len(items)}, "File context saved")
+    return create_success_response({"count": len(items), "operation": OP_FILE_CONTEXT_PUT}, "File context saved")
+
+
+# --- Mission-scoped Agent Presets ---
+@router.get("/idea-missions/{mission_id}/agents/presets", tags=["Agents"], summary="List mission agent presets")
+async def list_agent_presets(mission_id: str):
+    data = _read_json(_presets_path(mission_id), [])
+    return create_success_response(data, "Presets")
+
+@router.post("/idea-missions/{mission_id}/agents/presets", tags=["Agents"], summary="Create or replace a mission agent preset")
+async def create_agent_preset(mission_id: str, preset: AgentPreset):
+    presets = _read_json(_presets_path(mission_id), [])
+    presets = [p for p in presets if p.get('id') != preset.id]
+    presets.append(preset.model_dump())
+    _write_json(_presets_path(mission_id), presets)
+    return create_success_response(presets, "Preset saved")
+
+@router.delete("/idea-missions/{mission_id}/agents/presets/{preset_id}", tags=["Agents"], summary="Delete a mission agent preset")
+async def delete_agent_preset(mission_id: str, preset_id: str):
+    presets = _read_json(_presets_path(mission_id), [])
+    new_list = [p for p in presets if p.get('id') != preset_id]
+    _write_json(_presets_path(mission_id), new_list)
+    return create_success_response({"id": preset_id}, "Preset removed")
+
+class ReorderRequest(BaseModel):
+    order: List[str]
+
+@router.put("/idea-missions/{mission_id}/agents/presets/order", tags=["Agents"], summary="Reorder mission agent presets")
+async def reorder_agent_presets(mission_id: str, body: ReorderRequest):
+    presets = _read_json(_presets_path(mission_id), [])
+    id_to_preset = {p.get('id'): p for p in presets}
+    new_list = [id_to_preset[i] for i in body.order if i in id_to_preset]
+    # Append any missing (safety)
+    for p in presets:
+        if p.get('id') not in body.order:
+            new_list.append(p)
+    _write_json(_presets_path(mission_id), new_list)
+    return create_success_response({"count": len(new_list)}, "Order updated")
 
 
 # --- Add external text file ---
@@ -514,7 +627,7 @@ class AddTextArtifactRequest(BaseModel):
     format: Optional[str] = "markdown"  # markdown|text|json
     metadata: Optional[Dict[str, Any]] = None
 
-@router.post("/idea-missions/{mission_id}/artifacts/text")
+@router.post("/idea-missions/{mission_id}/artifacts/text", tags=["Artifacts"], summary="Add external text artifact")
 async def add_text_artifact(mission_id: str, req: AddTextArtifactRequest):
     try:
         mission_dir = _mission_dir(mission_id)
@@ -548,13 +661,14 @@ async def add_text_artifact(mission_id: str, req: AddTextArtifactRequest):
         manifest.insert(0, record)
         _write_json(manifest_path, manifest)
 
-        return create_success_response({ "artifact": { **record, "downloadUrl": f"/api/v1/idea-missions/{mission_id}/files/{artifact_id}" } }, "Artifact added")
+        _log_activity(mission_id, OP_ARTIFACT_SAVE, {"name": req.name, "format": req.format}, user_id=req.userId, result={"artifactId": artifact_id})
+        return create_success_response({ "artifact": { **record, "downloadUrl": f"/api/v1/idea-missions/{mission_id}/files/{artifact_id}", "uri": f"idea://{mission_id}/artifact/{artifact_id}" } }, "Artifact added")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to add artifact: {str(e)}")
 
 
 # --- Chat history ---
-@router.get("/idea-missions/{mission_id}/chat")
+@router.get("/idea-missions/{mission_id}/chat", tags=["Chat"], summary="Get chat history")
 async def get_chat_history(mission_id: str):
     chat = _read_json(_chat_path(mission_id), [])
     return create_success_response(chat, "Chat history")
@@ -568,7 +682,7 @@ class AppendMessageRequest(BaseModel):
     agentIcon: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
-@router.post("/idea-missions/{mission_id}/chat")
+@router.post("/idea-missions/{mission_id}/chat", tags=["Chat"], summary="Append a chat message")
 async def append_chat_message(mission_id: str, req: AppendMessageRequest):
     chat_path = _chat_path(mission_id)
     chat = _read_json(chat_path, [])
@@ -585,6 +699,10 @@ async def append_chat_message(mission_id: str, req: AppendMessageRequest):
     }
     chat.append(record)
     _write_json(chat_path, chat)
-    return create_success_response(record, "Message appended")
+    # Activity log (non-blocking)
+    _log_activity(mission_id, OP_CHAT_APPEND, {"role": req.role})
+    # Return a response copy enriched with operation; avoid mutating persisted record
+    response_rec = {**record, "operation": OP_CHAT_APPEND}
+    return create_success_response(response_rec, "Message appended")
 
 
