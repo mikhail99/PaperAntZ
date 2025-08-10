@@ -5,6 +5,7 @@ import { Thread } from '@assistant-ui/react'
 import { BaseChatProps, ChatMessage, ChatAction } from '@/types/chat'
 import { useChat } from '@/lib/chat/context'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -19,6 +20,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   Save as SaveIcon,
+  Pin,
+  PinOff,
   TargetIcon,
   BrainIcon,
   FileEditIcon,
@@ -118,6 +121,9 @@ export function BaseChat({
   const renderMessage = useCallback((message: ChatMessage) => {
     const isUser = message.role === 'user'
     const isAgent = message.role === 'assistant' && (message.agentId || message.agentIcon)
+    const liked = (message.metadata as any)?.liked === true
+    const disliked = (message.metadata as any)?.disliked === true
+    const pinned = (message.metadata as any)?.pinned === true
     
     return (
       <div
@@ -127,19 +133,24 @@ export function BaseChat({
           isUser ? 'flex-row-reverse' : 'flex-row'
         )}
       >
-        <div
+          <div
           className={cn(
-            'flex-1 max-w-[80%]',
+            'flex-1 max-w-[80%] relative',
             isUser ? 'text-right' : 'text-left'
           )}
+          style={{ pointerEvents: 'auto' }}
         >
           <div
             className={cn(
               'inline-block p-3 rounded-lg',
               isUser
                 ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
+                : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100',
+              pinned && 'ring-2 ring-yellow-400',
+              liked && 'shadow-[0_0_0_2px_rgba(34,197,94,0.4)]',
+              disliked && 'opacity-60'
             )}
+            style={{ pointerEvents: 'auto' }}
           >
             {/* Agent info header */}
             {isAgent && (
@@ -161,14 +172,14 @@ export function BaseChat({
                   size="sm"
                   onClick={() => onMessageAction?.(message, 'like')}
                 >
-                  <ThumbsUp className="h-3 w-3 mr-1" /> Like
+                  <ThumbsUp className={cn('h-3 w-3 mr-1', liked && 'text-green-600')} /> Like
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => onMessageAction?.(message, 'dislike')}
                 >
-                  <ThumbsDown className="h-3 w-3 mr-1" /> Dislike
+                  <ThumbsDown className={cn('h-3 w-3 mr-1', disliked && 'text-red-600')} /> Dislike
                 </Button>
                 <Button
                   variant="outline"
@@ -193,6 +204,17 @@ export function BaseChat({
               </div>
             )}
           </div>
+          {/* Include checkbox (acts as pin) for user messages */}
+          {isUser && (
+            <div className={cn('mt-2 flex items-center gap-2 pointer-events-auto z-10', isUser ? 'justify-end' : 'justify-start')}>
+              <Checkbox
+                id={`pin-${message.id}`}
+                checked={pinned}
+                onCheckedChange={(val:any)=> onMessageAction?.(message, val ? 'pin' : 'unpin')}
+              />
+              <label htmlFor={`pin-${message.id}`} className="text-xs text-gray-600 cursor-pointer select-none">Include in context</label>
+            </div>
+          )}
           <div className="text-xs opacity-50 mt-1">
             {message.timestamp.toLocaleTimeString()}
           </div>

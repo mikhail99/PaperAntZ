@@ -54,5 +54,187 @@
     "rating": "down",
     "reason": null,
     "timestamp": "2025-08-08T16:13:52.412129"
+  },
+  {
+    "messageId": "1754780823449",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T01:07:23.667639"
+  },
+  {
+    "messageId": "1754780823449",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:07:25.452522"
+  },
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:11:01.105902"
+  },
+  {
+    "messageId": "msg_968bf785",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:13:07.991647"
+  },
+  {
+    "messageId": "msg_968bf785",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T01:13:09.277457"
+  },
+  {
+    "messageId": "msg_d986a221",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:13:25.507294"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:13:52.016561"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T01:13:52.903366"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:17:14.691222"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T01:17:17.555597"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:17:19.652869"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T01:17:23.207008"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:17:26.869423"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T01:17:28.806613"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T01:25:20.376877"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:25:21.496951"
+  },
+  {
+    "messageId": "msg_968bf785",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T01:25:54.423996"
+  },
+  {
+    "messageId": "msg_968bf785",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T01:25:55.804463"
+  },
+  {
+    "messageId": "msg_25d9374d",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T10:10:37.589974"
+  },
+  {
+    "messageId": "msg_968bf785",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T10:10:39.359870"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T10:10:42.190568"
+  },
+  {
+    "messageId": "msg_dd6a3c26",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T14:15:47.367260"
+  },
+  {
+    "messageId": "msg_c12264ce",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T14:15:49.392473"
+  },
+  {
+    "messageId": "msg_c12264ce",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T14:15:50.573030"
+  },
+  {
+    "messageId": "msg_c12264ce",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T14:15:51.546207"
+  },
+  {
+    "messageId": "msg_c12264ce",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T14:15:52.342126"
   }
 ]

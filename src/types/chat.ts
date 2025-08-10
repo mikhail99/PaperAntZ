@@ -104,22 +104,24 @@ export interface BaseChatProps {
   className?: string
   onInputChange?: (value: string) => void
   onKeyDown?: (e: React.KeyboardEvent) => void
-  inputRef?: React.RefObject<HTMLInputElement>
+  inputRef?: React.RefObject<HTMLInputElement | null>
   value?: string
-  onMessageAction?: (message: ChatMessage, action: 'like' | 'dislike' | 'save') => void
+  onMessageAction?: (message: ChatMessage, action: 'like' | 'dislike' | 'save' | 'pin' | 'unpin') => void
 }
 
 export interface AgentChatProps extends Omit<BaseChatProps, 'onSendMessage'> {
   agents: AgentType[]
   selectedAgent: AgentType | null
   onAgentSelect: (agent: AgentType) => void
-  onAgentExecute: (agent: AgentType, message: string, files: FileContext[]) => void
+  onAgentExecute: (agent: AgentType, message: string, files: FileContext[], history: ChatMessage[]) => void
   generatedFiles: ChatFile[]
   onFileRename?: (fileId: string, newName: string) => void
   onFileDelete?: (fileId: string) => void
   onAddTextFile?: () => void
   onFileEdit?: (fileId: string) => void
   onFileContextChange?: (items: FileSelectionState[]) => void
+  onFileStar?: (fileId: string, starred: boolean) => void
+  starredIds?: string[]
 }
 
 export interface DocumentChatProps extends Omit<BaseChatProps, 'onSendMessage'> {

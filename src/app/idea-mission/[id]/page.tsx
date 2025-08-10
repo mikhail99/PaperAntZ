@@ -156,11 +156,13 @@ export default function IdeaMissionDetail() {
     { id: 'research', name: 'Research Agent', description: 'Analyzes market and feasibility', color: 'green', icon: 'brain' },
     { id: 'writing', name: 'Writing Agent', description: 'Drafts the idea report', color: 'purple', icon: 'file-edit' },
     { id: 'review', name: 'Review Agent', description: 'Reviews and refines outputs', color: 'orange', icon: 'users' },
+    { id: 'semantic', name: 'Semantic Search', description: 'Retrieve ranked snippets from selected group', color: 'cyan', icon: 'search' },
+    { id: 'hybrid', name: 'Hybrid (PaperQA)', description: 'Synthesize answers using PaperQA', color: 'teal', icon: 'search' },
   ];
 
   const handleAgentSelect = (agent: AgentType) => setSelectedAgent(agent);
 
-  const handleAgentExecute = async (agent: AgentType, message: string, filesInput: FileContext[]) => {
+  const handleAgentExecute = async (agent: AgentType, message: string, filesInput: FileContext[], historyForRun?: ChatMessage[]) => {
     setIsChatLoading(true);
     const userMessage: ChatMessage = { id: Date.now().toString(), role: 'user', content: message, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
@@ -170,7 +172,7 @@ export default function IdeaMissionDetail() {
         const exec = await ideaAgentService.executePlanning(missionId, {
           userId: 'demo-user',
           message,
-          history: messages.map(m => ({ id: m.id, role: m.role, content: m.content })),
+          history: (historyForRun || messages).map(m => ({ id: m.id, role: m.role, content: m.content })),
           files: filesInput,
           documentGroupIds: mission?.documentGroupIds || [],
         });
@@ -185,6 +187,28 @@ export default function IdeaMissionDetail() {
           agentIcon: agent.icon,
         };
         setMessages(prev => [...prev, agentMessage]);
+      } else if (agent.id === 'semantic') {
+        const groupId = (mission?.documentGroupIds || [])[0]
+        if (!groupId) throw new Error('Select a Document Group for Semantic Search')
+        const params = new URLSearchParams({ query: message, limit: '10' })
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+        const res = await fetch(`${apiBase}/document-groups/${groupId}/search?${params.toString()}`)
+        if (!res.ok) throw new Error('Semantic search failed')
+        const data = await res.json()
+        const items = (data?.data?.results || []) as any[]
+        const md = ['### Semantic Search Results', '', ...items.slice(0,10).map((r:any, i:number)=>`${i+1}. [${r.title||'Untitled'}](${r.url||'#'}) — ${(r.abstract||'').slice(0,220)}`)].join('\n')
+        const agentMessage: ChatMessage = { id: (Date.now()+1).toString(), role: 'assistant', content: md, timestamp: new Date(), agentId: agent.id, agentName: agent.name, agentIcon: agent.icon }
+        setMessages(prev => [...prev, agentMessage])
+      } else if (agent.id === 'hybrid') {
+        const groupId = (mission?.documentGroupIds || [])[0]
+        if (!groupId) throw new Error('Select a Document Group for Hybrid search')
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+        const res = await fetch(`${apiBase}/document-groups/${groupId}/paperqa`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: message }) })
+        if (!res.ok) throw new Error('Hybrid (PaperQA) failed')
+        const data = await res.json()
+        const md = data?.data?.answer || 'No answer.'
+        const agentMessage: ChatMessage = { id: (Date.now()+2).toString(), role: 'assistant', content: md, timestamp: new Date(), agentId: agent.id, agentName: agent.name, agentIcon: agent.icon }
+        setMessages(prev => [...prev, agentMessage])
       } else {
         // Fallback: echo
         const agentMessage: ChatMessage = {
@@ -511,17 +535,26 @@ export default function IdeaMissionDetail() {
                   }}
                   onMessageAction={async (message, action) => {
                     try {
-                      if (message.role !== 'assistant') return;
                       if (!mission) return;
                       if (action === 'like' || action === 'dislike') {
-                        await ideaAgentService.submitFeedback(missionId, message.id, { userId: 'demo-user', rating: action === 'like' ? 'up' : 'down' });
-                        toast({ title: 'Feedback sent', description: action === 'like' ? 'Marked as helpful' : 'Marked as not helpful' });
+                        // Optimistic UI update for color feedback
+                        setMessages(prev => prev.map(m => m.id === message.id ? { ...m, metadata: { ...(m.metadata||{}), liked: action==='like', disliked: action==='dislike' } } : m))
+                        if (message.role === 'assistant') {
+                          await ideaAgentService.submitFeedback(missionId, message.id, { userId: 'demo-user', rating: action === 'like' ? 'up' : 'down' });
+                          toast({ title: 'Feedback sent', description: action === 'like' ? 'Marked as helpful' : 'Marked as not helpful' });
+                        }
                       }
                       if (action === 'save') {
                         setSaveTarget(message);
                         const defaultName = mission.title.replace(/\s+/g, '-').toLowerCase();
                         setSaveName(defaultName);
                         setSaveOpen(true);
+                      }
+                      if (action === 'pin') {
+                        setMessages(prev => prev.map(m => m.id === message.id ? { ...m, metadata: { ...(m.metadata||{}), pinned: true } } : m))
+                      }
+                      if (action === 'unpin') {
+                        setMessages(prev => prev.map(m => m.id === message.id ? { ...m, metadata: { ...(m.metadata||{}), pinned: false } } : m))
                       }
                     } catch (e) {
                       console.error('action failed', e);

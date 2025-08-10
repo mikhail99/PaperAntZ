@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { BaseChat } from './BaseChat'
-import { AgentChatProps, AgentType, ChatFile, FileSuggestion, FileContext } from '@/types/chat'
+import { AgentChatProps, AgentType, ChatFile, FileSuggestion, FileContext, ChatMessage } from '@/types/chat'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { Label } from '@/components/ui/label'
@@ -61,6 +61,20 @@ const AGENT_TYPES: AgentType[] = [
     description: 'Reviews and refines final reports',
     color: 'orange',
     icon: 'users'
+  },
+  {
+    id: 'semantic',
+    name: 'Semantic Search',
+    description: 'Retrieve ranked snippets from selected document group',
+    color: 'cyan',
+    icon: 'search'
+  },
+  {
+    id: 'hybrid',
+    name: 'Hybrid (PaperQA)',
+    description: 'Synthesize answers using PaperQA over the group',
+    color: 'teal',
+    icon: 'search'
   }
 ]
 
@@ -145,6 +159,8 @@ const getAgentIcon = (iconName: string) => {
       return <FileEditIcon className="h-5 w-5 text-purple-600" />
     case 'users':
       return <UsersIcon className="h-5 w-5 text-orange-600" />
+    case 'search':
+      return <SearchIcon className="h-5 w-5 text-cyan-600" />
     default:
       return <BotIcon className="h-5 w-5 text-gray-600" />
   }
@@ -206,6 +222,9 @@ export function AgentChat({
   const [draftAgent, setDraftAgent] = useState<AgentType | null>(null)
   // Mission presets are used only to prefill prompt values for fixed agents
   const [missionPresets, setMissionPresets] = useState<any[]>([])
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(new Set())
+  const [lastN, setLastN] = useState<number>(6)
+  const [showContextTray, setShowContextTray] = useState(false)
 
   // Enhanced file filtering with better search
   const filteredFiles = useMemo(() => {
@@ -373,15 +392,25 @@ export function AgentChat({
       }
     }
 
-    onAgentExecute(selectedAgent, inputValue, contexts)
+    // Build history according to policy: last N (exclude disliked), plus pinned user messages
+    const lastMessages = messages.slice(-lastN)
+    const filteredLast = lastMessages.filter(m => !(m.metadata && m.metadata.disliked))
+    const pinned = messages.filter(m => pinnedMessageIds.has(m.id) && m.role === 'user')
+    const pairEntries: [string, ChatMessage][] = [
+      ...(filteredLast as ChatMessage[]).map((m)=>[m.id, m] as [string, ChatMessage]),
+      ...(pinned as ChatMessage[]).map((m)=>[m.id, m] as [string, ChatMessage])
+    ]
+    const history = Array.from(new Map<string, ChatMessage>(pairEntries).values()) as ChatMessage[]
+
+    onAgentExecute(selectedAgent, inputValue, contexts, history)
     
     // Mark agent as executed
     setExecutedAgents(prev => new Set([...prev, selectedAgent.id]))
     
     // Clear input
     setInputValue('')
-    setSelectedFiles([])
-  }, [selectedAgent, inputValue, availableFiles, parseFileReferences, onAgentExecute])
+    setSelectedFiles({} as any)
+  }, [selectedAgent, inputValue, availableFiles, parseFileReferences, onAgentExecute, messages, lastN, pinnedMessageIds])
 
   // Handle message send (delegates to agent execution)
   const handleSendMessage = useCallback((message: string, attachments?: File[]) => {
@@ -398,23 +427,25 @@ export function AgentChat({
     }
     
     const referencedFiles = parseFileReferences(message)
-    const filesToPass = [...(attachments || []), ...availableFiles.filter(file => 
-      referencedFiles.includes(file.name)
-    )]
-
-    onAgentExecute(selectedAgent, message, filesToPass)
+    const filesToPass: FileContext[] = availableFiles
+      .filter(file => referencedFiles.includes(file.name))
+      .map(file => ({ id: file.id, name: file.name, url: file.url }))
+    // Default to lastN-based history if handleExecuteAgent didn't build it
+    const lastMessages = messages.slice(-lastN)
+    const filteredLast = lastMessages.filter(m => !(m as any)?.metadata?.disliked)
+    onAgentExecute(selectedAgent, message, filesToPass, filteredLast as any)
     
     // Mark agent as executed
     setExecutedAgents(prev => new Set([...prev, selectedAgent.id]))
     
     // Clear input after sending
     setInputValue('')
-  }, [selectedAgent, availableFiles, parseFileReferences, onAgentExecute])
+  }, [selectedAgent, availableFiles, parseFileReferences, onAgentExecute, messages, lastN])
 
   return (
     <div className={cn('flex h-full gap-4', className)}>
       {/* Agent Selection Panel */}
-      <Card className="w-80 flex-shrink-0">
+      <Card className="w-80 flex-shrink-0 overflow-hidden">
         <CardContent className="p-4 h-full flex flex-col">
           <h3 className="font-semibold mb-4">Agents</h3>
           <Button variant="outline" size="sm" className="mb-3" onClick={() => {
@@ -422,20 +453,30 @@ export function AgentChat({
           }}>Browse marketplace</Button>
           
           {/* Fixed agents with original card look and inline Edit */}
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 h-0">
             <div className="space-y-2">
               {AGENT_TYPES.map((a) => {
                 const isSelected = selectedAgent?.id === a.id
                 return (
-                  <div key={a.id} className={cn('w-full h-auto p-3 border rounded-lg', isSelected && 'border-2')}> 
+                  <div
+                    key={a.id}
+                    className={cn(
+                      'w-full h-auto p-3 border rounded-lg cursor-pointer transition-colors',
+                      isSelected ? 'border-blue-400 bg-blue-50/60' : 'hover:bg-gray-50 dark:hover:bg-gray-900/10'
+                    )}
+                    onClick={() => onAgentSelect(a)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e)=>{ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAgentSelect(a) } }}
+                  > 
                     <div className="flex items-center gap-3 w-full">
                       <div className="text-2xl">{getAgentIcon(a.icon)}</div>
-                      <button className="flex-1 text-left" onClick={() => onAgentSelect(a)}>
+                      <button className="flex-1 text-left" onClick={(e)=>{ e.stopPropagation(); onAgentSelect(a) }}>
                         <div className="font-medium">{a.name}</div>
                         <div className="text-xs opacity-70">{a.description}</div>
                       </button>
                       <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" title="Edit" onClick={() => {
+                        <Button size="icon" variant="ghost" title="Edit" onClick={(e) => { e.stopPropagation();
                           // Prefill prompt from mission preset if present
                           const preset = missionPresets.find((p:any)=> (p.agentType === a.id) || (p.id === `preset_${a.id}`))
                           setDraftAgent({ ...a, systemPrompt: preset?.systemPrompt || '' })
@@ -571,7 +612,17 @@ export function AgentChat({
             onKeyDown={handleKeyDown}
             inputRef={inputRef}
             value={inputValue}
-            onMessageAction={onMessageAction}
+            onMessageAction={(message, action) => {
+              if (action === 'pin') {
+                setPinnedMessageIds(prev => new Set(prev).add(message.id))
+                onMessageAction?.(message, action)
+              } else if (action === 'unpin') {
+                setPinnedMessageIds(prev => { const n = new Set(prev); n.delete(message.id); return n })
+                onMessageAction?.(message, action)
+              } else {
+                onMessageAction?.(message, action)
+              }
+            }}
           />
 
           {/* Enhanced File Suggestions Dropdown */}
@@ -657,6 +708,52 @@ export function AgentChat({
           )}
         </div>
       </div>
+      {/* Context tray trigger */}
+      <div className="fixed bottom-4 left-4 z-20">
+        <Button variant="outline" size="sm" onClick={()=>setShowContextTray(v=>!v)}>Context</Button>
+      </div>
+      {showContextTray && (
+        <Card className="fixed bottom-16 left-4 right-4 md:left-1/4 md:right-1/4 z-30 shadow-xl">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="font-medium">Context to send</div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs">Last N</span>
+                <input type="range" min={1} max={20} value={lastN} onChange={(e)=>setLastN(parseInt(e.target.value))} />
+              </div>
+            </div>
+            <div className="text-xs text-gray-500">Pinned messages outside N are included. Disliked are excluded.</div>
+            <div className="mt-2">
+              <div className="font-semibold text-sm mb-1">Messages</div>
+              <div className="space-y-1 max-h-40 overflow-auto">
+                {(() => {
+                  const lastMessages = messages.slice(-lastN).filter(m => !(m.metadata && m.metadata.disliked))
+                  const pinned = messages.filter(m => pinnedMessageIds.has(m.id) && m.role === 'user')
+                  const pairEntries2: [string, ChatMessage][] = [
+                    ...(lastMessages as ChatMessage[]).map((m)=>[m.id, m] as [string, ChatMessage]),
+                    ...(pinned as ChatMessage[]).map((m)=>[m.id, m] as [string, ChatMessage])
+                  ]
+                  const list = Array.from(new Map<string, ChatMessage>(pairEntries2).values()) as ChatMessage[]
+                  return list.map((m) => (
+                    <div key={m.id} className="flex items-center gap-2 text-sm">
+                      <span className="px-1 rounded bg-gray-100">{m.role}</span>
+                      <span className="truncate">{m.content.slice(0,80)}</span>
+                      {pinnedMessageIds.has(m.id) && <span className="text-[10px] px-1 rounded bg-yellow-100">Pinned</span>}
+                    </div>
+                  ))
+                })()}
+              </div>
+            </div>
+            <div className="mt-2">
+              <div className="font-semibold text-sm mb-1">Files (checked)</div>
+              <div className="text-xs text-gray-600">Edit prompts via Edit on files.</div>
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={()=>setShowContextTray(false)}>Close</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
           {/* Parameters Drawer (prompt-only for MVP) */}
       <Drawer open={showParams} onOpenChange={setShowParams}>
         <DrawerContent className="sm:max-w-md">

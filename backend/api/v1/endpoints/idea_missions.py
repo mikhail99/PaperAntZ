@@ -26,6 +26,7 @@ store_lock = asyncio.Lock()
 
 # Canonical operation names (MCP-ready)
 OP_PLANNING_EXECUTE = "idea.planning.execute"
+OP_RESEARCH_EXECUTE = "idea.research.execute"
 OP_ARTIFACT_LIST = "idea.artifacts.list"
 OP_ARTIFACT_SAVE = "idea.artifacts.save"
 OP_ARTIFACT_RENAME = "idea.artifacts.rename"
@@ -265,53 +266,58 @@ async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
     answer: str
     mode: str = "mock"
     try:
+        # Load mission-scoped planning prompt override if present
+        planning_prompt = None
         try:
-            import dspy  # type: ignore
+            presets = _read_json(_presets_path(mission_id), [])
+            for p in presets:
+                if p.get('agentType') == 'planning' or p.get('id') in ('preset_planning', 'planning'):
+                    planning_prompt = p.get('systemPrompt') or None
+                    break
         except Exception:
-            dspy = None  # type: ignore
-
-        if dspy is None:
-            answer = mock_plan(req.message, context_text)
-        else:
-            # Configure per call (allows env overrides)
-            api_base = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
-            model = os.getenv('PLANNING_MODEL', 'ollama_chat/qwen3:4b')
-            dspy.configure(lm=dspy.LM(model, api_base=api_base, api_key=''))
-
-            class PlanningBrainstorm(dspy.Module):
-                def __init__(self):
-                    super().__init__()
-                    self.predict = dspy.Predict("instruction, context -> plan")
-
-                def forward(self, instruction: str, context: str):
-                    return self.predict(instruction=instruction, context=context)
-
-            # Load mission-scoped planning prompt override if present
             planning_prompt = None
-            try:
-                presets = _read_json(_presets_path(mission_id), [])
-                for p in presets:
-                    if p.get('agentType') == 'planning' or p.get('id') in ('preset_planning', 'planning'):
-                        planning_prompt = p.get('systemPrompt') or None
-                        break
-            except Exception:
-                planning_prompt = None
 
-            # Include file prompts as lightweight context
-            file_context = "\n".join([
-                f"FILE: {f.get('name')}\nPROMPT: {f.get('prompt','')}\nURL: {f.get('url','')}"
-                for f in (req.files or [])
-            ])
-            base_instruction = (
-                "You are a Planning Agent. Brainstorm a structured plan for the user's idea. "
-                "Provide a concise markdown plan with sections: Objectives, Assumptions, Approach, Milestones, Risks, Deliverables. "
-                "If file prompts are provided, reflect them appropriately in the plan."
+        # Include file prompts as lightweight context
+        file_context = "\n".join([
+            f"FILE: {f.get('name')}\nPROMPT: {f.get('prompt','')}\nURL: {f.get('url','')}"
+            for f in (req.files or [])
+        ])
+        base_instruction = (
+            "You are a Planning Agent. Brainstorm a structured plan for the user's idea. "
+            "Provide a concise markdown plan with sections: Objectives, Assumptions, Approach, Milestones, Risks, Deliverables. "
+            "If file prompts are provided, reflect them appropriately in the plan."
+        )
+        instruction = (planning_prompt or base_instruction).strip()
+
+        # Prefer OpenAI Agents SDK + LiteLLM if available
+        try:
+            from agents import Agent as OAAgent, Runner  # type: ignore
+            from agents.extensions.models.litellm_model import LitellmModel  # type: ignore
+
+            # Allow env override; default to Ollama Qwen3:4b via LiteLLM's ollama provider
+            litellm_model = os.getenv('PLANNING_LITELLM_MODEL', 'ollama/qwen3:4b')
+            litellm_api_key = os.getenv('LITELLM_API_KEY', os.getenv('OPENAI_API_KEY', ''))
+
+            # Compose single-turn input including history and files
+            composed = (
+                f"History (recent):\n{context_text}\n\n" 
+                f"Files:\n{file_context}\n\n"
+                f"Task:\n{req.message}"
             )
-            instruction = planning_prompt.strip() if planning_prompt else base_instruction
-            module = PlanningBrainstorm()
-            out = module(instruction=instruction, context=f"User: {req.message}\n\nHistory:\n{context_text}\n\nFiles:\n{file_context}")
-            answer = out.plan if hasattr(out, 'plan') else str(out)
-            mode = "model"
+            oa_agent = OAAgent(
+                name="Planning Agent",
+                instructions=instruction,
+                model=LitellmModel(model=litellm_model, api_key=litellm_api_key),
+                tools=[],
+            )
+            # Runner is async; FastAPI handler is async as well
+            result = await Runner.run(oa_agent, composed)
+            answer = getattr(result, 'final_output', None) or str(result)
+            mode = "agents_litellm"
+        except Exception:
+            # Fallback to deterministic mock plan
+            answer = mock_plan(req.message, context_text)
+            mode = "mock"
     except Exception:
         # Final fallback to ensure 200 response
         answer = mock_plan(req.message, context_text)
@@ -356,6 +362,125 @@ async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
         "operation": OP_PLANNING_EXECUTE,
         "chatUri": f"idea://{mission_id}/chat",
     }, "Planning agent completed")
+
+
+# --- Literature Researcher execution ---
+class ExecuteResearchRequest(BaseModel):
+    userId: str
+    topic: str
+    criteria: Optional[str] = None
+    years: Optional[int] = 5
+    history: Optional[List[ChatHistoryItem]] = None
+    files: Optional[List[Dict[str, Any]]] = None
+
+
+@router.post("/idea-missions/{mission_id}/agents/research/execute", tags=["Research"], summary="Execute Literature Researcher")
+async def execute_research_agent(mission_id: str, req: ExecuteResearchRequest):
+    """Use OpenAI Agents SDK + LiteLLM (if available) to perform a literature scan plan and synthesis.
+    Falls back to a deterministic mock if unavailable.
+    """
+    def mock_research(topic: str, criteria: Optional[str], years: int) -> str:
+        return (
+            f"## Literature Scan: {topic}\n\n"
+            f"### Criteria\n{criteria or 'Peer-reviewed; last %d years; primary results; reproducibility notes' % years}\n\n"
+            f"### Queries\n- arxiv: {topic} AND recent:%d\n- web: {topic} review survey\n\n" % years +
+            "### Screening\n- [Placeholder] Title A — include (matches criteria).\n- [Placeholder] Title B — exclude (out of scope).\n\n"
+            "### Evidence Table (sample)\n| citation | year | venue | method | dataset | metric | value |\n\n"
+            "### Synthesis\n- Key trends...\n- Limitations...\n- Open problems...\n"
+        )
+
+    # Load mission-scoped research prompt override if present
+    research_prompt = None
+    try:
+        presets = _read_json(_presets_path(mission_id), [])
+        for p in presets:
+            if p.get('agentType') == 'research' or p.get('id') in ('preset_research', 'research'):
+                research_prompt = p.get('systemPrompt') or None
+                break
+    except Exception:
+        research_prompt = None
+
+    base_instruction = (
+        "You are a Literature Researcher with access to tools (conceptually): arxiv_search, web_search, fetch_pdf, "
+        "extract_pdf_text, summarize_text. Plan queries, screen results against criteria, and produce a concise synthesis. "
+        "Return a short markdown report with sections: Criteria, Queries, Screening decisions, Evidence table (compact), Synthesis."
+    )
+    instruction = (research_prompt or base_instruction).strip()
+
+    # Include brief context from history (optional)
+    history = req.history or []
+    context_lines = []
+    for h in history[-6:]:
+        role = (h.role or "user")[:6].upper()
+        context_lines.append(f"{role}: {h.content}")
+    context_text = "\n".join(context_lines)
+
+    # Prefer Agents SDK + LiteLLM if installed
+    mode = "mock"
+    try:
+        try:
+            from agents import Agent as OAAgent, Runner  # type: ignore
+            from agents.extensions.models.litellm_model import LitellmModel  # type: ignore
+            litellm_model = os.getenv('RESEARCH_LITELLM_MODEL', os.getenv('PLANNING_LITELLM_MODEL', 'ollama/qwen3:4b'))
+            litellm_api_key = os.getenv('LITELLM_API_KEY', os.getenv('OPENAI_API_KEY', ''))
+
+            composed = (
+                f"Context:\n{context_text}\n\n"
+                f"Topic: {req.topic}\nYears: {req.years or 5}\nCriteria: {req.criteria or ''}\n"
+            )
+            oa_agent = OAAgent(
+                name="Literature Researcher",
+                instructions=instruction,
+                model=LitellmModel(model=litellm_model, api_key=litellm_api_key),
+                tools=[],
+            )
+            result = await Runner.run(oa_agent, composed)
+            answer = getattr(result, 'final_output', None) or str(result)
+            mode = "agents_litellm"
+        except Exception:
+            answer = mock_research(req.topic, req.criteria, req.years or 5)
+            mode = "mock"
+    except Exception:
+        answer = mock_research(req.topic, req.criteria, req.years or 5)
+        mode = "mock"
+
+    # Persist to chat like other agents
+    execution_id = generate_id("exec")
+    assistant_message_id = generate_id("msg")
+    user_message_id = generate_id("msg")
+
+    chat_path = _chat_path(mission_id)
+    chat = _read_json(chat_path, [])
+    chat.append({
+        "id": user_message_id,
+        "role": "user",
+        "content": f"[Research] {req.topic}",
+        "timestamp": get_timestamp(),
+    })
+    chat.append({
+        "id": assistant_message_id,
+        "role": "assistant",
+        "content": answer,
+        "timestamp": get_timestamp(),
+        "agentId": "research",
+        "agentName": "Research Agent",
+        "agentIcon": "brain",
+        "metadata": {"mode": mode},
+    })
+    _write_json(chat_path, chat)
+
+    _log_activity(mission_id, OP_RESEARCH_EXECUTE, {"topic": req.topic}, user_id=req.userId, result={"assistantMessageId": assistant_message_id})
+
+    return create_success_response({
+        "executionId": execution_id,
+        "messageId": assistant_message_id,
+        "userMessageId": user_message_id,
+        "agent": "research",
+        "answer": answer,
+        "mode": mode,
+        "operation": OP_RESEARCH_EXECUTE,
+        "chatUri": f"idea://{mission_id}/chat",
+    }, "Research agent completed")
 
 
 # --- Feedback (thumbs up/down) ---
