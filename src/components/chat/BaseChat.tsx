@@ -67,13 +67,14 @@ export function BaseChat({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const internalInputRef = useRef<HTMLInputElement>(null)
   const finalInputRef = inputRef || internalInputRef
+  const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set())
 
   // Use controlled value if provided, otherwise use internal state
   const currentInputValue = value !== undefined ? value : inputValue
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
+  }, [expandedMessageIds, onMessageAction])
 
   React.useEffect(() => {
     scrollToBottom()
@@ -124,6 +125,9 @@ export function BaseChat({
     const liked = (message.metadata as any)?.liked === true
     const disliked = (message.metadata as any)?.disliked === true
     const pinned = (message.metadata as any)?.pinned === true
+    const contentText = message.content || ''
+    const isLong = contentText.length > 280 || contentText.includes('\n')
+    const isExpanded = expandedMessageIds.has(message.id)
     
     return (
       <div
@@ -152,7 +156,7 @@ export function BaseChat({
             )}
             style={{ pointerEvents: 'auto' }}
           >
-            {/* Agent info header */}
+            {/* Top header with agent info (toolbar only for assistant messages) */}
             {isAgent && (
               <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-center w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full">
@@ -161,10 +165,36 @@ export function BaseChat({
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
                   {message.agentName || 'Agent'}
                 </span>
+                <div className="ml-auto flex items-center gap-2">
+                  {isLong && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setExpandedMessageIds(prev => { const next = new Set(prev); if (next.has(message.id)) next.delete(message.id); else next.add(message.id); return next; })}
+                    >
+                      {isExpanded ? 'Collapse' : 'Expand'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigator.clipboard?.writeText(message.content || '')}
+                  >
+                    Copy
+                  </Button>
+                </div>
               </div>
             )}
             
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            {(!isAgent || isExpanded || !isLong) && (
+              <div
+                className={cn(
+                  'text-sm whitespace-pre-wrap'
+                )}
+              >
+                {contentText}
+              </div>
+            )}
             {isAgent && (
               <div className="mt-2 flex gap-2">
                 <Button

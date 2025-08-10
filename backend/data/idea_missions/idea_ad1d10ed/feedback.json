@@ -236,5 +236,26 @@
     "rating": "down",
     "reason": null,
     "timestamp": "2025-08-10T14:15:52.342126"
+  },
+  {
+    "messageId": "msg_c12264ce",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T19:35:04.402177"
+  },
+  {
+    "messageId": "msg_c12264ce",
+    "userId": "demo-user",
+    "rating": "down",
+    "reason": null,
+    "timestamp": "2025-08-10T19:35:05.767104"
+  },
+  {
+    "messageId": "msg_c12264ce",
+    "userId": "demo-user",
+    "rating": "up",
+    "reason": null,
+    "timestamp": "2025-08-10T19:35:07.967464"
   }
 ]
