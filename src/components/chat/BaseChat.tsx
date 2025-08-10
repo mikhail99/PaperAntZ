@@ -119,15 +119,34 @@ export function BaseChat({
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }, [])
 
+  const toggleMessageExpanded = useCallback((messageId: string) => {
+    setExpandedMessageIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(messageId)) newSet.delete(messageId)
+      else newSet.add(messageId)
+      return newSet
+    })
+  }, [])
+
   const renderMessage = useCallback((message: ChatMessage) => {
     const isUser = message.role === 'user'
-    const isAgent = message.role === 'assistant' && (message.agentId || message.agentIcon)
+    const isAgentRaw = message.role === 'assistant' && (message.agentId || message.agentIcon)
+    const isAgent = Boolean(isAgentRaw)
     const liked = (message.metadata as any)?.liked === true
     const disliked = (message.metadata as any)?.disliked === true
     const pinned = (message.metadata as any)?.pinned === true
     const contentText = message.content || ''
     const isLong = contentText.length > 280 || contentText.includes('\n')
     const isExpanded = expandedMessageIds.has(message.id)
+    // Debug: collapse/expand decision
+    // eslint-disable-next-line no-console
+    console.log('Message:', {
+      id: message.id,
+      isAgent,
+      isLong,
+      isExpanded,
+      shouldShow: (!isAgent || isExpanded || !isLong)
+    })
     
     return (
       <div
@@ -170,7 +189,7 @@ export function BaseChat({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setExpandedMessageIds(prev => { const next = new Set(prev); if (next.has(message.id)) next.delete(message.id); else next.add(message.id); return next; })}
+                      onClick={() => toggleMessageExpanded(message.id)}
                     >
                       {isExpanded ? 'Collapse' : 'Expand'}
                     </Button>
@@ -251,7 +270,7 @@ export function BaseChat({
         </div>
       </div>
     )
-  }, [])
+  }, [expandedMessageIds, onMessageAction, toggleMessageExpanded])
 
   return (
     <Card className={cn('w-full h-full flex flex-col', className)}>
