@@ -27,6 +27,7 @@ store_lock = asyncio.Lock()
 # Canonical operation names (MCP-ready)
 OP_PLANNING_EXECUTE = "idea.planning.execute"
 OP_RESEARCH_EXECUTE = "idea.research.execute"
+OP_SEARCH_SEMANTIC_EXECUTE = "idea.search.semantic.execute"
 OP_ARTIFACT_LIST = "idea.artifacts.list"
 OP_ARTIFACT_SAVE = "idea.artifacts.save"
 OP_ARTIFACT_RENAME = "idea.artifacts.rename"
@@ -481,6 +482,103 @@ async def execute_research_agent(mission_id: str, req: ExecuteResearchRequest):
         "operation": OP_RESEARCH_EXECUTE,
         "chatUri": f"idea://{mission_id}/chat",
     }, "Research agent completed")
+
+
+# --- Semantic Search Agent (OpenAI Agents SDK + LiteLLM, tool = collection search) ---
+class ExecuteSemanticRequest(BaseModel):
+    userId: str
+    groupId: str
+    query: str
+    limit: Optional[int] = 10
+
+
+@router.post("/idea-missions/{mission_id}/agents/search/semantic/execute", tags=["Search"], summary="Execute Semantic Search agent")
+async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticRequest):
+    """Semantic search over a document group via an agent with one tool.
+    Returns a compact list of paper ids and abstracts.
+    """
+    import json as _json
+from urllib.parse import urlencode
+import urllib.request as _urlreq
+from core.agents.search_semantic import SemanticSearchAgent
+from core.agents.base import find_agent_preset
+
+    def direct_search(group_id: str, query: str, limit: int) -> list:
+        base = os.getenv('API_INTERNAL_BASE', '').rstrip('/') or f"http://localhost:{os.getenv('PORT','8000')}"
+        path = f"/api/v1/document-groups/{group_id}/search?" + urlencode({"query": query, "limit": str(limit)})
+        url = base + path
+        with _urlreq.urlopen(url) as resp:  # type: ignore
+            data = _json.loads(resp.read().decode('utf-8'))
+        items = data.get('data', {}).get('results', []) if isinstance(data, dict) else []
+        results = []
+        for it in items:
+            results.append({
+                "id": it.get('id'),
+                "title": it.get('title'),
+                "abstract": it.get('abstract'),
+                "metadata": {
+                    "authors": it.get('authors'),
+                    "publication_date": it.get('publication_date'),
+                    "url": it.get('url'),
+                    "relevance_score": it.get('relevance_score'),
+                }
+            })
+        return results
+
+    results: list
+    mode = "mock"
+    try:
+        try:
+            # Load mission-scoped preset for semantic
+            preset = find_agent_preset(_read_json(_presets_path(mission_id), []), 'semantic')
+            system_prompt = preset.get('systemPrompt') if isinstance(preset, dict) else None
+            agent = SemanticSearchAgent(direct_search)
+            out = await agent.run(group_id=req.groupId, query=req.query, limit=req.limit or 10, system_prompt=system_prompt)
+            mode = out.get('mode', 'agents_litellm')
+            results = out.get('results', [])
+        except Exception:
+            results = direct_search(req.groupId, req.query, req.limit or 10)
+            mode = "direct"
+    except Exception:
+        results = []
+        mode = "error"
+
+    # Persist chat record (assistant summary as markdown with top N titles)
+    execution_id = generate_id("exec")
+    assistant_message_id = generate_id("msg")
+    user_message_id = generate_id("msg")
+
+    chat_path = _chat_path(mission_id)
+    chat = _read_json(chat_path, [])
+    chat.append({"id": user_message_id, "role": "user", "content": f"[Semantic Search] {req.query}", "timestamp": get_timestamp()})
+    # Build markdown summary
+    lines = ["### Semantic Search Results", ""]
+    for i, it in enumerate(results[:10]):
+        title = it.get('title') or 'Untitled'
+        lines.append(f"{i+1}. {title}")
+    chat.append({
+        "id": assistant_message_id,
+        "role": "assistant",
+        "content": "\n".join(lines),
+        "timestamp": get_timestamp(),
+        "agentId": "semantic",
+        "agentName": "Semantic Search",
+        "agentIcon": "search",
+        "metadata": {"mode": mode, "count": len(results)},
+    })
+    _write_json(chat_path, chat)
+
+    _log_activity(mission_id, OP_SEARCH_SEMANTIC_EXECUTE, {"query": req.query, "groupId": req.groupId}, user_id=req.userId, result={"count": len(results)})
+
+    return create_success_response({
+        "executionId": execution_id,
+        "messageId": assistant_message_id,
+        "userMessageId": user_message_id,
+        "agent": "semantic",
+        "mode": mode,
+        "results": results,
+        "operation": OP_SEARCH_SEMANTIC_EXECUTE,
+    }, "Semantic search completed")
 
 
 # --- Feedback (thumbs up/down) ---

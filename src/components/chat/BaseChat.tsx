@@ -45,6 +45,20 @@ const getAgentIcon = (iconName: string) => {
   }
 }
 
+// Agent color identity for header chips
+const getAgentColors = (agentType?: string): string => {
+  const colors: Record<string, string> = {
+    planning: 'bg-purple-100 text-purple-800 border-purple-200',
+    research: 'bg-blue-100 text-blue-800 border-blue-200',
+    writing: 'bg-green-100 text-green-800 border-green-200',
+    review: 'bg-orange-100 text-orange-800 border-orange-200',
+    semantic: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    hybrid: 'bg-teal-100 text-teal-800 border-teal-200',
+  }
+  const key = (agentType || 'planning').toLowerCase()
+  return colors[key] || colors.planning
+}
+
 export function BaseChat({
   messages,
   onSendMessage,
@@ -152,13 +166,13 @@ export function BaseChat({
       <div
         key={message.id}
         className={cn(
-          'flex gap-3 p-4',
-          isUser ? 'flex-row-reverse' : 'flex-row'
+          'flex gap-3 p-4 rounded-lg',
+          isUser ? 'bg-blue-50 ml-auto max-w-[80%]' : 'bg-gray-50 mr-auto max-w-[85%]'
         )}
       >
           <div
           className={cn(
-            'flex-1 max-w-[80%] relative',
+            'flex-1 relative',
             isUser ? 'text-right' : 'text-left'
           )}
           style={{ pointerEvents: 'auto' }}
@@ -181,7 +195,12 @@ export function BaseChat({
                 <div className="flex items-center justify-center w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full">
                   {message.agentIcon ? getAgentIcon(message.agentIcon) : <BotIcon className="h-3 w-3 text-blue-600" />}
                 </div>
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-2 px-2 py-0.5 rounded-full text-[11px] font-medium border',
+                    getAgentColors(message.agentId)
+                  )}
+                >
                   {message.agentName || 'Agent'}
                 </span>
                 <div className="ml-auto flex items-center gap-2">

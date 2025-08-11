@@ -1,5 +1,18 @@
 [
   {
+    "id": "idea_e392e3e4",
+    "userId": "demo-user",
+    "title": "LLM for math",
+    "description": "use lean 4",
+    "status": "CREATED",
+    "documentGroupIds": [
+      "LLM_Reasoning_Agents"
+    ],
+    "createdAt": "2025-08-11T09:22:18.128282",
+    "updatedAt": "2025-08-11T09:22:18.128282",
+    "completedAt": null
+  },
+  {
     "id": "idea_ad1d10ed",
     "userId": "demo-user",
     "title": "test2",

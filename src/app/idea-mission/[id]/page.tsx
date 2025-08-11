@@ -190,13 +190,12 @@ export default function IdeaMissionDetail() {
       } else if (agent.id === 'semantic') {
         const groupId = (mission?.documentGroupIds || [])[0]
         if (!groupId) throw new Error('Select a Document Group for Semantic Search')
-        const params = new URLSearchParams({ query: message, limit: '10' })
         const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
-        const res = await fetch(`${apiBase}/document-groups/${groupId}/search?${params.toString()}`)
+        const res = await fetch(`${apiBase}/idea-missions/${missionId}/agents/search/semantic/execute`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId:'demo-user', groupId, query: message, limit: 10 }) })
         if (!res.ok) throw new Error('Semantic search failed')
         const data = await res.json()
-        const items = (data?.data?.results || []) as any[]
-        const md = ['### Semantic Search Results', '', ...items.slice(0,10).map((r:any, i:number)=>`${i+1}. [${r.title||'Untitled'}](${r.url||'#'}) — ${(r.abstract||'').slice(0,220)}`)].join('\n')
+        const results = (data?.data?.results || []) as any[]
+        const md = ['### Semantic Search Results', '', ...results.map((r:any, i:number)=>`${i+1}. ${r.title||'Untitled'}\nID: ${r.id || ''}\n${(r.abstract||'').slice(0,400)}\nMeta: ${(r.metadata?JSON.stringify(r.metadata):'{}')}`)].join('\n\n')
         const agentMessage: ChatMessage = { id: (Date.now()+1).toString(), role: 'assistant', content: md, timestamp: new Date(), agentId: agent.id, agentName: agent.name, agentIcon: agent.icon }
         setMessages(prev => [...prev, agentMessage])
       } else if (agent.id === 'hybrid') {

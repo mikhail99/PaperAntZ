@@ -119,6 +119,19 @@ export default function IdeaMissionPage() {
     }
   };
 
+  // Helpers to show linked group names on cards
+  const getGroupLabel = (ids: string[] | undefined) => {
+    const list = ids || []
+    if (list.length === 0) return ''
+    const names = list
+      .map(id => documentGroups.find(g => g.id === id)?.name)
+      .filter(Boolean) as string[]
+    if (names.length === 1) return names[0]
+    if (names.length > 1) return `${names[0]} +${names.length - 1}`
+    // Fallback if names not found
+    return `${list.length} group${list.length > 1 ? 's' : ''}`
+  }
+
   const handleExecuteMission = async (missionId: string) => {
     setIsLoading(true);
     // Simulate mission execution
@@ -286,7 +299,7 @@ export default function IdeaMissionPage() {
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs flex items-center gap-1">
                           <FolderOpen className="h-3 w-3" />
-                          {mission.documentGroupIds.length} group{mission.documentGroupIds.length > 1 ? 's' : ''}
+                          {getGroupLabel(mission.documentGroupIds)}
                         </Badge>
                       </div>
                     )}
@@ -304,7 +317,7 @@ export default function IdeaMissionPage() {
                       
                       {mission.documentGroupIds && mission.documentGroupIds.length > 0 && (
                         <div className="text-xs text-gray-600">
-                          Linked to {mission.documentGroupIds.length} document group{mission.documentGroupIds.length > 1 ? 's' : ''}
+                          Linked to {getGroupLabel(mission.documentGroupIds)}
                         </div>
                       )}
                       
@@ -326,24 +339,13 @@ export default function IdeaMissionPage() {
                         />
                       </div>
 
-                      {(mission.status === 'CREATED' || mission.status === 'PLANNING') ? (
-                        <Button 
-                          className="w-full" 
-                          onClick={() => handleExecuteMission(mission.id)}
-                          disabled={isLoading}
-                        >
-                          <Play className="h-4 w-4 mr-2" />
-                          Develop Idea
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
-                          onClick={() => router.push(`/idea-mission/${mission.id}`)}
-                        >
-                          View Details
-                        </Button>
-                      )}
+                      <Button 
+                        className="w-full" 
+                        onClick={() => router.push(`/idea-mission/${mission.id}`)}
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Open
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

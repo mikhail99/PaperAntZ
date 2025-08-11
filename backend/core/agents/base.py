@@ -151,3 +151,11 @@ Please provide a comprehensive response that addresses this task effectively.
                 formatted.append(f"{key}: {value}")
         
         return "\n".join(formatted)
+
+
+# Preset helpers (mission-scoped)
+def find_agent_preset(presets: list[dict], agent_type: str) -> dict:
+    for p in presets or []:
+        if p.get('agentType') == agent_type or p.get('id') in (f'preset_{agent_type}', agent_type):
+            return p
+    return {}
