@@ -14,6 +14,7 @@ import os
 from utils.helpers import generate_id, get_timestamp, create_success_response
 from urllib.parse import urlencode
 import urllib.request as _urlreq
+from core.data_models import SemanticSearchResult, SemanticSearchResponse
 
 router = APIRouter()
 
@@ -578,7 +579,7 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
     logger = logging.getLogger(__name__)
     logger.info(f"Semantic search request: mission_id={mission_id}, group_id={req.groupId}, query='{req.query}', limit={req.limit}")
 
-    async def direct_search(group_id: str, query: str, limit: int) -> list:
+    async def direct_search(group_id: str, query: str, limit: int) -> List[SemanticSearchResult]:
         base = os.getenv('API_INTERNAL_BASE', '').rstrip('/') or f"http://localhost:{os.getenv('PORT','8000')}"
         path = f"/api/v1/document-groups/{group_id}/search?" + urlencode({"query": query, "limit": str(limit)})
         url = base + path
@@ -596,17 +597,19 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
         items = data.get('data', {}).get('results', []) if isinstance(data, dict) else []
         results = []
         for it in items:
-            results.append({
-                "id": it.get('id'),
-                "title": it.get('title'),
-                "abstract": it.get('abstract'),
-                "metadata": {
-                    "authors": it.get('authors'),
+            # Use Pydantic model for type safety and validation
+            result = SemanticSearchResult(
+                id=it.get('id', ''),
+                title=it.get('title', 'Untitled'),
+                abstract=it.get('abstract', ''),
+                metadata={
+                    "authors": it.get('authors', []),
                     "publication_date": it.get('publication_date'),
                     "url": it.get('url'),
                     "relevance_score": it.get('relevance_score'),
                 }
-            })
+            )
+            results.append(result)
         return results
 
     results: list
@@ -635,16 +638,24 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
     chat_path = _chat_path(mission_id)
     chat = _read_json(chat_path, [])
     chat.append({"id": user_message_id, "role": "user", "content": f"[Semantic Search] {req.query}", "timestamp": get_timestamp()})
-    # Build markdown summary with titles and abstracts
+    # Build markdown summary with titles, authors, and abstracts
+    logger.info(f"Building markdown summary for {len(results)} results")
+    print("DEBUG: Building markdown summary with authors and abstracts")  # Simple debug print
     lines = ["### Semantic Search Results", ""]
-    for i, it in enumerate(results[:10]):
-        title = it.get('title') or 'Untitled'
-        abstract = it.get('abstract', '')
+    for i, result in enumerate(results[:10]):
+        # Use typed properties for type safety
+        title = result.title
+        abstract = result.abstract
+        authors = result.metadata.get('authors', [])  # Direct access to metadata
+        logger.info(f"Result {i+1}: title='{title[:50]}...', abstract_length={len(abstract)}, authors={authors}")
+        logger.info(f"Result {i+1}: metadata={result.metadata}")
         lines.append(f"{i+1}. **{title}**")
+        if authors:
+            lines.append(f"   **Authors:** {', '.join(authors)}")
         if abstract:
             # Truncate abstract if too long
             abstract_preview = abstract[:300] + "..." if len(abstract) > 300 else abstract
-            lines.append(f"   {abstract_preview}")
+            lines.append(f"   **Abstract:** {abstract_preview}")
         lines.append("")  # Add spacing between items
     chat.append({
         "id": assistant_message_id,
@@ -654,7 +665,7 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
         "agentId": "semantic",
         "agentName": "Semantic Search",
         "agentIcon": "search",
-        "metadata": {"mode": mode, "count": len(results)},
+        "metadata": {"mode": mode, "count": len(results), "semanticResults": [result.dict() for result in results]},
     })
     _write_json(chat_path, chat)
 
@@ -668,7 +679,7 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
         "userMessageId": user_message_id,
         "agent": "semantic",
         "mode": mode,
-        "results": results,
+        "results": [result.dict() for result in results],
         "operation": OP_SEARCH_SEMANTIC_EXECUTE,
     }, "Semantic search completed")
 

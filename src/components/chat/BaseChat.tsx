@@ -216,7 +216,29 @@ export function BaseChat({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigator.clipboard?.writeText(message.content || '')}
+                    onClick={() => {
+                      // Prefer structured semantic results if present; otherwise copy raw content
+                      const results = (message.metadata as any)?.semanticResults as any[] | undefined
+                      if (message.agentId === 'semantic' && Array.isArray(results) && results.length > 0) {
+                        const lines: string[] = ['### Semantic Search Results', '']
+                        for (let i = 0; i < Math.min(results.length, 10); i++) {
+                          const r = results[i] || {}
+                          const title = r.title || 'Untitled'
+                          const abstract = r.abstract || ''
+                          const authors = r.metadata?.authors || []
+                          const preview = abstract.length > 500 ? abstract.slice(0, 500) + '...' : abstract
+                          lines.push(`${i + 1}. **${title}**`)
+                          if (authors.length > 0) {
+                            lines.push(`   **Authors:** ${authors.join(', ')}`)
+                          }
+                          if (preview) lines.push(`   **Abstract:** ${preview}`)
+                          lines.push('')
+                        }
+                        navigator.clipboard?.writeText(lines.join('\n'))
+                      } else {
+                        navigator.clipboard?.writeText(message.content || '')
+                      }
+                    }}
                   >
                     Copy
                   </Button>

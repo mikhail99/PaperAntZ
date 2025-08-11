@@ -1,7 +1,13 @@
 [
   {
     "id": "file_e8d3044a",
-    "name": "file_e8d3044a",
+    "name": "planning_llm-for-math-2.md",
+    "prompt": "",
+    "selected": true
+  },
+  {
+    "id": "file_8fd595fc",
+    "name": "file_8fd595fc",
     "prompt": "",
     "selected": true
   }

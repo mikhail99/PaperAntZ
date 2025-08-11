@@ -195,9 +195,27 @@ export default function IdeaMissionDetail() {
         if (!res.ok) throw new Error('Semantic search failed')
         const data = await res.json()
         const results = (data?.data?.results || []) as any[]
-        const summaryMd = ['### Semantic Search Results', '', ...results.map((r:any, i:number)=>`${i+1}. ${r.title||'Untitled'} (ID: ${r.id||''})`).slice(0,10)].join('\n')
+        const messageId = (data?.data?.messageId as string) || (Date.now()+1).toString()
+
+        // Build a markdown summary that includes titles, authors, and abstract previews
+        const summaryMdLines: string[] = ['### Semantic Search Results', '']
+        for (let i = 0; i < Math.min(results.length, 10); i++) {
+          const r: any = results[i] || {}
+          const title: string = r.title || 'Untitled'
+          const abstract: string = r.abstract || ''
+          const authors: string[] = r.metadata?.authors || []
+          const preview = abstract.length > 500 ? abstract.slice(0, 500) + '...' : abstract
+          summaryMdLines.push(`${i + 1}. **${title}**`)
+          if (authors.length > 0) {
+            summaryMdLines.push(`   **Authors:** ${authors.join(', ')}`)
+          }
+          if (preview) summaryMdLines.push(`   **Abstract:** ${preview}`)
+          summaryMdLines.push('')
+        }
+        const summaryMd = summaryMdLines.join('\n')
+
         const agentMessage: ChatMessage = {
-          id: (Date.now()+1).toString(),
+          id: messageId,
           role: 'assistant',
           content: summaryMd,
           timestamp: new Date(),
@@ -705,16 +723,37 @@ export default function IdeaMissionDetail() {
               <Button onClick={async () => {
                 if (!saveTarget || !mission) return;
                 try {
+                  // If this is a semantic message and we have structured results, rebuild markdown with abstracts and authors
+                  const semanticResults = (saveTarget.metadata as any)?.semanticResults as any[] | undefined
+                  let contentToSave = saveTarget.content || ''
+                  if (saveTarget.agentId === 'semantic' && Array.isArray(semanticResults) && semanticResults.length > 0) {
+                    const lines: string[] = ['### Semantic Search Results', '']
+                    for (let i = 0; i < Math.min(semanticResults.length, 10); i++) {
+                      const r = semanticResults[i] || {}
+                      const title = r.title || 'Untitled'
+                      const abstract = r.abstract || ''
+                      const authors = r.metadata?.authors || []
+                      const preview = abstract.length > 1000 ? abstract.slice(0, 1000) + '...' : abstract
+                      lines.push(`${i + 1}. **${title}**`)
+                      if (authors.length > 0) {
+                        lines.push(`   **Authors:** ${authors.join(', ')}`)
+                      }
+                      if (preview) lines.push(`   **Abstract:** ${preview}`)
+                      lines.push('')
+                    }
+                    contentToSave = lines.join('\n')
+                  }
+
                   const res = await ideaAgentService.saveMessage(missionId, saveTarget.id, {
                     userId: 'demo-user',
-                    content: saveTarget.content,
+                    content: contentToSave,
                     format: 'markdown',
                     filenameHint: saveName || mission.title.replace(/\s+/g, '-').toLowerCase(),
                     metadata: { agentId: saveTarget.agentId, agentName: saveTarget.agentName },
                   });
                   const artifact = res.artifact;
                   const fileName = artifact?.name || `${saveName || 'idea-plan'}.md`;
-                  const added = addGeneratedFile(fileName, saveTarget.content || '', saveTarget.agentName || 'Agent', 'text/markdown', artifact?.id, artifact?.downloadUrl);
+                  const added = addGeneratedFile(fileName, contentToSave || '', saveTarget.agentName || 'Agent', 'text/markdown', artifact?.id, artifact?.downloadUrl);
                   setGeneratedFiles(prev => [added, ...prev]);
                   setAvailableFiles(prev => [added, ...prev]);
                   // store prompt selection
