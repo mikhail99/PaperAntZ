@@ -195,8 +195,16 @@ export default function IdeaMissionDetail() {
         if (!res.ok) throw new Error('Semantic search failed')
         const data = await res.json()
         const results = (data?.data?.results || []) as any[]
-        const md = ['### Semantic Search Results', '', ...results.map((r:any, i:number)=>`${i+1}. ${r.title||'Untitled'}\nID: ${r.id || ''}\n${(r.abstract||'').slice(0,400)}\nMeta: ${(r.metadata?JSON.stringify(r.metadata):'{}')}`)].join('\n\n')
-        const agentMessage: ChatMessage = { id: (Date.now()+1).toString(), role: 'assistant', content: md, timestamp: new Date(), agentId: agent.id, agentName: agent.name, agentIcon: agent.icon }
+        const agentMessage: ChatMessage = {
+          id: (Date.now()+1).toString(),
+          role: 'assistant',
+          content: 'Semantic Search Results',
+          timestamp: new Date(),
+          agentId: agent.id,
+          agentName: agent.name,
+          agentIcon: agent.icon,
+          metadata: { semanticResults: results }
+        }
         setMessages(prev => [...prev, agentMessage])
       } else if (agent.id === 'hybrid') {
         const groupId = (mission?.documentGroupIds || [])[0]
@@ -593,7 +601,7 @@ export default function IdeaMissionDetail() {
                       <div key={f.id} className="flex items-center justify-between p-3 border rounded-md">
                         <div className="truncate">{f.name}</div>
                         <Button size="sm" variant="outline" onClick={() => {
-                          const blob = new Blob([f.content], { type: 'text/plain' });
+                          const blob = new Blob([f.content || ''], { type: 'text/plain' });
                           const url = URL.createObjectURL(blob);
                           const a = document.createElement('a');
                           a.href = url; a.download = f.name; a.click(); URL.revokeObjectURL(url);
@@ -687,7 +695,7 @@ export default function IdeaMissionDetail() {
                   });
                   const artifact = res.artifact;
                   const fileName = artifact?.name || `${saveName || 'idea-plan'}.md`;
-                  const added = addGeneratedFile(fileName, saveTarget.content, saveTarget.agentName || 'Agent', 'text/markdown', artifact?.id, artifact?.downloadUrl);
+                  const added = addGeneratedFile(fileName, saveTarget.content || '', saveTarget.agentName || 'Agent', 'text/markdown', artifact?.id, artifact?.downloadUrl);
                   setGeneratedFiles(prev => [added, ...prev]);
                   setAvailableFiles(prev => [added, ...prev]);
                   // store prompt selection
@@ -728,7 +736,7 @@ export default function IdeaMissionDetail() {
                   const res = await ideaAgentService.addTextArtifact(missionId, { userId: 'demo-user', name: addName, content: addContent, format: 'markdown' });
                   const artifact = res.artifact;
                   const fileName = artifact?.name || `${addName}.md`;
-                  const added = addGeneratedFile(fileName, addContent, 'External', 'text/markdown', artifact?.id, artifact?.downloadUrl);
+                  const added = addGeneratedFile(fileName, addContent || '', 'External', 'text/markdown', artifact?.id, artifact?.downloadUrl);
                   setGeneratedFiles(prev => [added, ...prev]);
                   setAvailableFiles(prev => [added, ...prev]);
                   toast({ title: 'Added', description: `${fileName} added to Available Files` });

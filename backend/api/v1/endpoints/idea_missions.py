@@ -498,10 +498,8 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
     Returns a compact list of paper ids and abstracts.
     """
     import json as _json
-from urllib.parse import urlencode
-import urllib.request as _urlreq
-from core.agents.search_semantic import SemanticSearchAgent
-from core.agents.base import find_agent_preset
+    from core.agents.search_semantic import SemanticSearchAgent
+    from core.agents.base import find_agent_preset
 
     def direct_search(group_id: str, query: str, limit: int) -> list:
         base = os.getenv('API_INTERNAL_BASE', '').rstrip('/') or f"http://localhost:{os.getenv('PORT','8000')}"

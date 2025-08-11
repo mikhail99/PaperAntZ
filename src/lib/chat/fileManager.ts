@@ -194,8 +194,8 @@ export function useFileManager() {
     return chatFile
   }, [fileManager, refreshFiles])
 
-  const addGeneratedFile = useCallback((name: string, content: string, generatedBy: string, type?: string, providedId?: string) => {
-    const chatFile = fileManager.addGeneratedFile(name, content, generatedBy, type, providedId)
+  const addGeneratedFile = useCallback((name: string, content: string, generatedBy: string, type?: string, providedId?: string, url?: string) => {
+    const chatFile = fileManager.addGeneratedFile(name, content, generatedBy, type, providedId, url)
     refreshFiles()
     return chatFile
   }, [fileManager, refreshFiles])

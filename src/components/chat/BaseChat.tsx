@@ -225,12 +225,24 @@ export function BaseChat({
             )}
             
             {(!isAgent || isExpanded || !isLong) && (
-              <div
-                className={cn(
-                  'text-sm whitespace-pre-wrap'
+              <div className="text-sm whitespace-pre-wrap">
+                {/* Structured rendering for semantic results if present */}
+                {isAgent && message.agentId === 'semantic' && (message.metadata as any)?.semanticResults ? (
+                  <div className="space-y-3">
+                    {((message.metadata as any).semanticResults as any[]).map((r, idx) => (
+                      <div key={r.id || idx} className="p-2 border rounded-md bg-white text-left">
+                        <div className="font-medium text-sm">{r.title || 'Untitled'}</div>
+                        <div className="text-xs text-gray-500">ID: {r.id}</div>
+                        <div className="mt-1 text-sm">{(r.abstract || '').slice(0, 500)}</div>
+                        {r.metadata && (
+                          <div className="mt-1 text-xs text-gray-600">{JSON.stringify(r.metadata)}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>{contentText}</>
                 )}
-              >
-                {contentText}
               </div>
             )}
             {isAgent && (
