@@ -12,6 +12,8 @@ from datetime import datetime
 import os
 
 from utils.helpers import generate_id, get_timestamp, create_success_response
+from urllib.parse import urlencode
+import urllib.request as _urlreq
 
 router = APIRouter()
 
@@ -20,6 +22,7 @@ BASE_DIR = Path(__file__).resolve().parents[3]  # points to backend/
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 STORE_FILE = DATA_DIR / "idea_missions.json"
+DEFAULT_PRESETS_FILE = DATA_DIR / "agents_presets.defaults.json"
 
 # Concurrency control
 store_lock = asyncio.Lock()
@@ -121,6 +124,65 @@ def _write_json(path: Path, data):
     tmp.replace(path)
 
 
+# Built-in default agent presets that will be written to DEFAULT_PRESETS_FILE
+# on first use. Users can edit that file to change organization-wide defaults.
+DEFAULT_AGENT_PRESETS: List[Dict[str, Any]] = [
+    {
+        "id": "preset_planning",
+        "name": "Planning Agent",
+        "agentType": "planning",
+        "icon": "target",
+        "temperature": 0.7,
+        "styleLevel": 50,
+        "systemPrompt": (
+            "You are a Planning Agent. Brainstorm a structured plan for the user's idea. "
+            "Provide a concise markdown plan with sections: Objectives, Assumptions, Approach, "
+            "Milestones, Risks, Deliverables. If file prompts are provided, reflect them in the plan."
+        ),
+    },
+    {
+        "id": "preset_research",
+        "name": "Research Agent",
+        "agentType": "research",
+        "icon": "brain",
+        "temperature": 0.25,
+        "styleLevel": 50,
+        "systemPrompt": (
+            "You are a Literature Researcher with access to tools (conceptually): arxiv_search, "
+            "web_search, fetch_pdf, extract_pdf_text, summarize_text. Plan queries, screen results "
+            "against criteria, and produce a concise synthesis. Return a short markdown report with "
+            "sections: Criteria, Queries, Screening decisions, Evidence table (compact), Synthesis."
+        ),
+    },
+    {
+        "id": "preset_semantic",
+        "name": "Semantic Search",
+        "agentType": "semantic",
+        "icon": "search",
+        "temperature": 0.0,
+        "styleLevel": 30,
+        "systemPrompt": (
+            "You are a semantic search assistant. Given a user query and a document group, "
+            "retrieve the most relevant items and present a compact readable summary."
+        ),
+    },
+]
+
+
+def _ensure_default_presets_file_exists() -> None:
+    """Create DEFAULT_PRESETS_FILE with DEFAULT_AGENT_PRESETS if missing.
+
+    This allows admins to edit organization-wide defaults in a single place.
+    """
+    try:
+        if not DEFAULT_PRESETS_FILE.exists():
+            DEFAULT_PRESETS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            _write_json(DEFAULT_PRESETS_FILE, DEFAULT_AGENT_PRESETS)
+    except Exception:
+        # Do not fail mission creation because of defaults file issues
+        pass
+
+
 def _log_activity(mission_id: str, operation: str, args_summary: Dict[str, Any], user_id: Optional[str] = None, result: Optional[Dict[str, Any]] = None):
     """Append a lightweight activity record for auditing/analytics.
     Non-failing best-effort; never raises in request flow.
@@ -179,6 +241,14 @@ async def create_idea_mission(req: CreateIdeaMissionRequest):
         missions = _read_store()
         missions.insert(0, new_mission)
         _write_store(missions)
+    # Seed mission-scoped agent presets from org-wide defaults (if any)
+    try:
+        _ensure_default_presets_file_exists()
+        presets = _read_json(DEFAULT_PRESETS_FILE, DEFAULT_AGENT_PRESETS)
+        _write_json(_presets_path(new_mission["id"]), presets)
+    except Exception:
+        # Non-fatal; mission can proceed without presets file
+        pass
     return create_success_response(new_mission, "Idea mission created")
 
 
@@ -265,7 +335,7 @@ async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
     context_text = "\n".join(context_lines)
 
     answer: str
-    mode: str = "mock"
+    mode: str = "agents_litellm"
     try:
         # Load mission-scoped planning prompt override if present
         planning_prompt = None
@@ -313,16 +383,17 @@ async def execute_planning_agent(mission_id: str, req: ExecutePlanningRequest):
             )
             # Runner is async; FastAPI handler is async as well
             result = await Runner.run(oa_agent, composed)
-            answer = getattr(result, 'final_output', None) or str(result)
-            mode = "agents_litellm"
-        except Exception:
-            # Fallback to deterministic mock plan
-            answer = mock_plan(req.message, context_text)
-            mode = "mock"
-    except Exception:
-        # Final fallback to ensure 200 response
-        answer = mock_plan(req.message, context_text)
-        mode = "mock"
+            answer = (getattr(result, 'final_output', None) or str(result) or "").strip()
+            if not answer:
+                # Guard: if the SDK returns an empty string, fall back to a deterministic plan
+                answer = mock_plan(req.message, context_text)
+                mode = "mock"
+            else:
+                mode = "agents_litellm"
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Planning agent unavailable: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Planning failed: {str(e)}")
 
     execution_id = generate_id("exec")
     assistant_message_id = generate_id("msg")
@@ -417,7 +488,7 @@ async def execute_research_agent(mission_id: str, req: ExecuteResearchRequest):
     context_text = "\n".join(context_lines)
 
     # Prefer Agents SDK + LiteLLM if installed
-    mode = "mock"
+    mode = "agents_litellm"
     try:
         try:
             from agents import Agent as OAAgent, Runner  # type: ignore
@@ -436,14 +507,16 @@ async def execute_research_agent(mission_id: str, req: ExecuteResearchRequest):
                 tools=[],
             )
             result = await Runner.run(oa_agent, composed)
-            answer = getattr(result, 'final_output', None) or str(result)
-            mode = "agents_litellm"
-        except Exception:
-            answer = mock_research(req.topic, req.criteria, req.years or 5)
-            mode = "mock"
-    except Exception:
-        answer = mock_research(req.topic, req.criteria, req.years or 5)
-        mode = "mock"
+            answer = (getattr(result, 'final_output', None) or str(result) or "").strip()
+            if not answer:
+                answer = mock_research(req.topic, req.criteria, req.years or 5)
+                mode = "mock"
+            else:
+                mode = "agents_litellm"
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Research agent unavailable: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Research failed: {str(e)}")
 
     # Persist to chat like other agents
     execution_id = generate_id("exec")
@@ -498,15 +571,28 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
     Returns a compact list of paper ids and abstracts.
     """
     import json as _json
+    import logging
     from core.agents.search_semantic import SemanticSearchAgent
     from core.agents.base import find_agent_preset
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Semantic search request: mission_id={mission_id}, group_id={req.groupId}, query='{req.query}', limit={req.limit}")
 
-    def direct_search(group_id: str, query: str, limit: int) -> list:
+    async def direct_search(group_id: str, query: str, limit: int) -> list:
         base = os.getenv('API_INTERNAL_BASE', '').rstrip('/') or f"http://localhost:{os.getenv('PORT','8000')}"
         path = f"/api/v1/document-groups/{group_id}/search?" + urlencode({"query": query, "limit": str(limit)})
         url = base + path
-        with _urlreq.urlopen(url) as resp:  # type: ignore
-            data = _json.loads(resp.read().decode('utf-8'))
+        
+        logger.info(f"direct_search: calling {url}")
+        
+        # Use aiohttp for async HTTP calls instead of blocking urllib
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                logger.info(f"direct_search: HTTP {resp.status}")
+                data = await resp.json()
+                logger.info(f"direct_search: received {len(data.get('data', {}).get('results', []))} results")
+        
         items = data.get('data', {}).get('results', []) if isinstance(data, dict) else []
         results = []
         for it in items:
@@ -524,22 +610,22 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
         return results
 
     results: list
-    mode = "mock"
+    mode = "agents_litellm"
     try:
-        try:
-            # Load mission-scoped preset for semantic
-            preset = find_agent_preset(_read_json(_presets_path(mission_id), []), 'semantic')
-            system_prompt = preset.get('systemPrompt') if isinstance(preset, dict) else None
-            agent = SemanticSearchAgent(direct_search)
-            out = await agent.run(group_id=req.groupId, query=req.query, limit=req.limit or 10, system_prompt=system_prompt)
-            mode = out.get('mode', 'agents_litellm')
-            results = out.get('results', [])
-        except Exception:
-            results = direct_search(req.groupId, req.query, req.limit or 10)
-            mode = "direct"
-    except Exception:
-        results = []
-        mode = "error"
+        # Load mission-scoped preset for semantic
+        preset = find_agent_preset(_read_json(_presets_path(mission_id), []), 'semantic')
+        system_prompt = preset.get('systemPrompt') if isinstance(preset, dict) else None
+        logger.info(f"Using preset: {preset.get('name') if preset else 'None'}")
+        
+        agent = SemanticSearchAgent(direct_search)
+        logger.info("Starting SemanticSearchAgent.run()")
+        out = await agent.run(group_id=req.groupId, query=req.query, limit=req.limit or 10, system_prompt=system_prompt)
+        mode = out.get('mode', 'agents_litellm')
+        results = out.get('results', [])
+        logger.info(f"SemanticSearchAgent completed: mode={mode}, results_count={len(results)}")
+    except Exception as e:
+        logger.error(f"Semantic search failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Semantic search failed: {str(e)}")
 
     # Persist chat record (assistant summary as markdown with top N titles)
     execution_id = generate_id("exec")
@@ -549,11 +635,17 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
     chat_path = _chat_path(mission_id)
     chat = _read_json(chat_path, [])
     chat.append({"id": user_message_id, "role": "user", "content": f"[Semantic Search] {req.query}", "timestamp": get_timestamp()})
-    # Build markdown summary
+    # Build markdown summary with titles and abstracts
     lines = ["### Semantic Search Results", ""]
     for i, it in enumerate(results[:10]):
         title = it.get('title') or 'Untitled'
-        lines.append(f"{i+1}. {title}")
+        abstract = it.get('abstract', '')
+        lines.append(f"{i+1}. **{title}**")
+        if abstract:
+            # Truncate abstract if too long
+            abstract_preview = abstract[:300] + "..." if len(abstract) > 300 else abstract
+            lines.append(f"   {abstract_preview}")
+        lines.append("")  # Add spacing between items
     chat.append({
         "id": assistant_message_id,
         "role": "assistant",
@@ -568,6 +660,8 @@ async def execute_semantic_search_agent(mission_id: str, req: ExecuteSemanticReq
 
     _log_activity(mission_id, OP_SEARCH_SEMANTIC_EXECUTE, {"query": req.query, "groupId": req.groupId}, user_id=req.userId, result={"count": len(results)})
 
+    logger.info(f"Semantic search endpoint completed successfully: {len(results)} results, mode={mode}")
+    
     return create_success_response({
         "executionId": execution_id,
         "messageId": assistant_message_id,

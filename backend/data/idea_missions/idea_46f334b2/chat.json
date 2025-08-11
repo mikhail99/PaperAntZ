@@ -1,0 +1,135 @@
+[
+  {
+    "id": "msg_c3175b12",
+    "role": "user",
+    "content": "[Semantic Search] using llm for math",
+    "timestamp": "2025-08-11T13:51:44.783028"
+  },
+  {
+    "id": "msg_b00d2c19",
+    "role": "assistant",
+    "content": "### Semantic Search Results\n",
+    "timestamp": "2025-08-11T13:51:44.783055",
+    "agentId": "semantic",
+    "agentName": "Semantic Search",
+    "agentIcon": "search",
+    "metadata": {
+      "mode": "error",
+      "count": 0
+    }
+  },
+  {
+    "id": "msg_653f6a18",
+    "role": "user",
+    "content": "[Semantic Search] llm for math",
+    "timestamp": "2025-08-11T16:18:52.928287"
+  },
+  {
+    "id": "msg_3d6ea516",
+    "role": "assistant",
+    "content": "### Semantic Search Results\n\n1. Unleashing the Reasoning Potential of Pre-trained LLMs by Critique Fine-Tuning on One Problem\n2. Mutual Reasoning Makes Smaller LLMs Stronger Problem-Solvers\n3. Can Compressed LLMs Truly Act? An Empirical Evaluation of Agentic Capabilities in LLM Compression\n4. Knowledge Augmented Complex Problem Solving with Large Language Models: A Survey\n5. Flow-DPO: Improving LLM Mathematical Reasoning through Online Multi-Agent Learning\n6. Self-Discover: Large Language Models Self-Compose Reasoning Structures\n7. Distilling LLM Agent into Small Models with Retrieval and Code Tools\n8. MALT: Improving Reasoning with Multi-Agent LLM Training\n9. From MOOC to MAIC: Reshaping Online Teaching and Learning through LLM-driven Agents\n10. Simulating Classroom Education with LLM-Empowered Agents",
+    "timestamp": "2025-08-11T16:18:52.928321",
+    "agentId": "semantic",
+    "agentName": "Semantic Search",
+    "agentIcon": "search",
+    "metadata": {
+      "mode": "direct",
+      "count": 10
+    }
+  },
+  {
+    "id": "msg_a454b0ac",
+    "role": "user",
+    "content": "[Semantic Search] llm for math",
+    "timestamp": "2025-08-11T17:02:00.399735"
+  },
+  {
+    "id": "msg_e427813a",
+    "role": "assistant",
+    "content": "### Semantic Search Results\n\n1. Unleashing the Reasoning Potential of Pre-trained LLMs by Critique Fine-Tuning on One Problem\n2. Mutual Reasoning Makes Smaller LLMs Stronger Problem-Solvers\n3. Can Compressed LLMs Truly Act? An Empirical Evaluation of Agentic Capabilities in LLM Compression\n4. Knowledge Augmented Complex Problem Solving with Large Language Models: A Survey\n5. Flow-DPO: Improving LLM Mathematical Reasoning through Online Multi-Agent Learning\n6. Self-Discover: Large Language Models Self-Compose Reasoning Structures\n7. Distilling LLM Agent into Small Models with Retrieval and Code Tools\n8. MALT: Improving Reasoning with Multi-Agent LLM Training\n9. From MOOC to MAIC: Reshaping Online Teaching and Learning through LLM-driven Agents\n10. Simulating Classroom Education with LLM-Empowered Agents",
+    "timestamp": "2025-08-11T17:02:00.399751",
+    "agentId": "semantic",
+    "agentName": "Semantic Search",
+    "agentIcon": "search",
+    "metadata": {
+      "mode": "agents_litellm_fallback",
+      "count": 10
+    }
+  },
+  {
+    "id": "msg_4831adf3",
+    "role": "user",
+    "content": "[Semantic Search] llm for math",
+    "timestamp": "2025-08-11T17:04:02.868377"
+  },
+  {
+    "id": "msg_09c4fadf",
+    "role": "assistant",
+    "content": "### Semantic Search Results\n\n1. Unleashing the Reasoning Potential of Pre-trained LLMs by Critique Fine-Tuning on One Problem\n2. Mutual Reasoning Makes Smaller LLMs Stronger Problem-Solvers\n3. Can Compressed LLMs Truly Act? An Empirical Evaluation of Agentic Capabilities in LLM Compression\n4. Knowledge Augmented Complex Problem Solving with Large Language Models: A Survey\n5. Flow-DPO: Improving LLM Mathematical Reasoning through Online Multi-Agent Learning",
+    "timestamp": "2025-08-11T17:04:02.868382",
+    "agentId": "semantic",
+    "agentName": "Semantic Search",
+    "agentIcon": "search",
+    "metadata": {
+      "mode": "agents_litellm_fallback",
+      "count": 5
+    }
+  },
+  {
+    "id": "msg_dbf4c65a",
+    "role": "user",
+    "content": "[Semantic Search] llm for physics",
+    "timestamp": "2025-08-11T17:09:28.835035"
+  },
+  {
+    "id": "msg_5f611a53",
+    "role": "assistant",
+    "content": "### Semantic Search Results\n\n1. Unleashing the Reasoning Potential of Pre-trained LLMs by Critique Fine-Tuning on One Problem\n2. Can LLMs Generate Novel Research Ideas? A Large-Scale Human Study with 100+ NLP Researchers\n3. LLM-Agent-UMF: LLM-based Agent Unified Modeling Framework for Seamless Integration of Multi Active/Passive Core-Agents\n4. Can Compressed LLMs Truly Act? An Empirical Evaluation of Agentic Capabilities in LLM Compression\n5. Self-Discover: Large Language Models Self-Compose Reasoning Structures\n6. From MOOC to MAIC: Reshaping Online Teaching and Learning through LLM-driven Agents\n7. Mutual Reasoning Makes Smaller LLMs Stronger Problem-Solvers\n8. WALL-E 2.0: World Alignment by NeuroSymbolic Learning improves World Model-based LLM Agents\n9. Agent Laboratory: Using LLM Agents as Research Assistants\n10. Simulating Classroom Education with LLM-Empowered Agents",
+    "timestamp": "2025-08-11T17:09:28.835047",
+    "agentId": "semantic",
+    "agentName": "Semantic Search",
+    "agentIcon": "search",
+    "metadata": {
+      "mode": "agents_litellm_fallback",
+      "count": 10
+    }
+  },
+  {
+    "id": "msg_7bc6432b",
+    "role": "user",
+    "content": "[Semantic Search] llm for physics",
+    "timestamp": "2025-08-11T17:10:34.474864"
+  },
+  {
+    "id": "msg_574b3734",
+    "role": "assistant",
+    "content": "### Semantic Search Results\n\n1. Unleashing the Reasoning Potential of Pre-trained LLMs by Critique Fine-Tuning on One Problem\n2. Can LLMs Generate Novel Research Ideas? A Large-Scale Human Study with 100+ NLP Researchers\n3. LLM-Agent-UMF: LLM-based Agent Unified Modeling Framework for Seamless Integration of Multi Active/Passive Core-Agents\n4. Can Compressed LLMs Truly Act? An Empirical Evaluation of Agentic Capabilities in LLM Compression\n5. Self-Discover: Large Language Models Self-Compose Reasoning Structures",
+    "timestamp": "2025-08-11T17:10:34.474869",
+    "agentId": "semantic",
+    "agentName": "Semantic Search",
+    "agentIcon": "search",
+    "metadata": {
+      "mode": "agents_litellm_fallback",
+      "count": 5
+    }
+  },
+  {
+    "id": "msg_496d1d39",
+    "role": "user",
+    "content": "[Semantic Search] machine learning agents",
+    "timestamp": "2025-08-11T17:32:35.485030"
+  },
+  {
+    "id": "msg_e5cd0d9a",
+    "role": "assistant",
+    "content": "### Semantic Search Results\n\n1. Symbolic Learning Enables Self-Evolving Agents\n2. MLRC-Bench: Can Language Agents Solve Machine Learning Research Challenges?\n3. TheAgentCompany: Benchmarking LLM Agents on Consequential Real World Tasks",
+    "timestamp": "2025-08-11T17:32:35.485043",
+    "agentId": "semantic",
+    "agentName": "Semantic Search",
+    "agentIcon": "search",
+    "metadata": {
+      "mode": "direct",
+      "count": 3
+    }
+  }
+]

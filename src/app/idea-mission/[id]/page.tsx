@@ -195,10 +195,11 @@ export default function IdeaMissionDetail() {
         if (!res.ok) throw new Error('Semantic search failed')
         const data = await res.json()
         const results = (data?.data?.results || []) as any[]
+        const summaryMd = ['### Semantic Search Results', '', ...results.map((r:any, i:number)=>`${i+1}. ${r.title||'Untitled'} (ID: ${r.id||''})`).slice(0,10)].join('\n')
         const agentMessage: ChatMessage = {
           id: (Date.now()+1).toString(),
           role: 'assistant',
-          content: 'Semantic Search Results',
+          content: summaryMd,
           timestamp: new Date(),
           agentId: agent.id,
           agentName: agent.name,
@@ -451,6 +452,24 @@ export default function IdeaMissionDetail() {
                     <Users className="h-4 w-4 mr-2" />
                     Share Idea
                   </Button>
+
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={async () => {
+                  if (!confirm('Delete this Idea Mission? This cannot be undone.')) return
+                  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+                  const res = await fetch(`${apiBase}/idea-missions/${missionId}`, { method: 'DELETE' })
+                  if (res.ok) {
+                    window.location.href = '/research'
+                  } else {
+                    const j = await res.json().catch(()=>({}))
+                    alert(`Failed to delete: ${j?.error || res.statusText}`)
+                  }
+                }}
+              >
+                Delete Mission
+              </Button>
                 </CardContent>
               </Card>
             </div>

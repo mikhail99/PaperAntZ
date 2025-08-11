@@ -1,0 +1,122 @@
+[
+  {
+    "timestamp": "2025-08-11T13:51:44.785029",
+    "operation": "idea.search.semantic.execute",
+    "userId": "demo-user",
+    "args": {
+      "query": "using llm for math",
+      "groupId": "LLM_Reasoning_Agents"
+    },
+    "result": {
+      "count": 0
+    }
+  },
+  {
+    "timestamp": "2025-08-11T16:18:52.931160",
+    "operation": "idea.search.semantic.execute",
+    "userId": "u-test",
+    "args": {
+      "query": "llm for math",
+      "groupId": "LLM_Reasoning_Agents"
+    },
+    "result": {
+      "count": 10
+    }
+  },
+  {
+    "timestamp": "2025-08-11T17:02:00.403436",
+    "operation": "idea.search.semantic.execute",
+    "userId": "demo-user",
+    "args": {
+      "query": "llm for math",
+      "groupId": "LLM_Reasoning_Agents"
+    },
+    "result": {
+      "count": 10
+    }
+  },
+  {
+    "timestamp": "2025-08-11T17:04:02.869070",
+    "operation": "idea.search.semantic.execute",
+    "userId": "demo-user",
+    "args": {
+      "query": "llm for math",
+      "groupId": "LLM_Reasoning_Agents"
+    },
+    "result": {
+      "count": 5
+    }
+  },
+  {
+    "timestamp": "2025-08-11T17:06:21.947853",
+    "operation": "idea.artifacts.save",
+    "userId": "demo-user",
+    "args": {
+      "messageId": "msg_09c4fadf",
+      "hint": null
+    },
+    "result": {
+      "artifactId": "file_2dc5b9a5"
+    }
+  },
+  {
+    "timestamp": "2025-08-11T17:07:45.690731",
+    "operation": "idea.artifacts.save",
+    "userId": "demo-user",
+    "args": {
+      "messageId": "msg_b00d2c19",
+      "hint": "llm-for-math-2"
+    },
+    "result": {
+      "artifactId": "file_e8d3044a"
+    }
+  },
+  {
+    "timestamp": "2025-08-11T17:09:28.836681",
+    "operation": "idea.search.semantic.execute",
+    "userId": "demo-user",
+    "args": {
+      "query": "llm for physics",
+      "groupId": "LLM_Reasoning_Agents"
+    },
+    "result": {
+      "count": 10
+    }
+  },
+  {
+    "timestamp": "2025-08-11T17:10:34.476075",
+    "operation": "idea.search.semantic.execute",
+    "userId": "demo-user",
+    "args": {
+      "query": "llm for physics",
+      "groupId": "LLM_Reasoning_Agents"
+    },
+    "result": {
+      "count": 5
+    }
+  },
+  {
+    "timestamp": "2025-08-11T17:12:43.522338",
+    "operation": "idea.artifacts.save",
+    "userId": "demo-user",
+    "args": {
+      "messageId": "msg_574b3734",
+      "hint": "llm-for-physics-search-results"
+    },
+    "result": {
+      "artifactId": "file_bd6b3386"
+    }
+  },
+  {
+    "timestamp": "2025-08-11T17:32:35.502083",
+    "operation": "idea.search.semantic.execute",
+    "userId": "demo-user",
+    "args": {
+      "query": "machine learning agents",
+      "groupId": "LLM_Reasoning_Agents"
+    },
+    "result": {
+      "count": 3
+    }
+  }
+]
